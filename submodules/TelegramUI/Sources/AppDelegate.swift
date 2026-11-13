@@ -728,7 +728,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             let controller = UIViewController()
             controller.view.backgroundColor = .systemBackground
             let label = UILabel()
-            label.text = "Niggagram could not initialize local storage.\n\(error.localizedDescription)"
+            label.text = "tearsgram could not initialize local storage.\n\(error.localizedDescription)"
             label.textColor = .label
             label.numberOfLines = 0
             label.textAlignment = .center

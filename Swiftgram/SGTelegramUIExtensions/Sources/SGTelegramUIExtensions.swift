@@ -35,6 +35,9 @@ func sgHandleInternalUrlRoute(context: AccountContext, parsedUrl: URL, navigatio
     case "settings":
         navigationController?.pushViewController(sgSettingsController(context: context))
         return true
+    case "tearsgram", "mod":
+        navigationController?.pushViewController(sgModSettingsController(context: context))
+        return true
     case "ios_settings":
         context.sharedContext.applicationBindings.openSettings()
         return true

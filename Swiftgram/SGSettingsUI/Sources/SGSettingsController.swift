@@ -128,6 +128,7 @@ private enum SGSliderSetting: String {
 private enum SGDisclosureLink: String {
     case contentSettings
     case languageSettings
+    case tearsgram
 }
 
 private struct PeerNameColorScreenState: Equatable {
@@ -149,6 +150,9 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     var entries: [SGControllerEntry] = []
     
     let id = SGItemListCounter()
+    
+    entries.append(.header(id: id.count, section: .content, text: "tearsgram", badge: nil))
+    entries.append(.disclosure(id: id.count, section: .content, link: .tearsgram, text: presentationData.strings.baseLanguageCode.hasPrefix("ru") ? "Приватность, удалённые сообщения, значок" : "Privacy, deleted messages, app badge"))
     
     entries.append(.searchInput(id: id.count, section: .search, title: NSAttributedString(string: "🔍"), text: state.searchQuery ?? "", placeholder: strings.Common_Search))
     if SGSimpleSettings.shared.canUseNY {
@@ -691,6 +695,8 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
             return
         }
         switch (link) {
+            case .tearsgram:
+                pushControllerImpl?(sgModSettingsController(context: context))
             case .languageSettings:
                 pushControllerImpl?(context.sharedContext.makeLocalizationListController(context: context))
             case .contentSettings:

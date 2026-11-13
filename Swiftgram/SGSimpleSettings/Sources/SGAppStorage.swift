@@ -12,7 +12,7 @@ public enum SGAppStorage {
         if let shared = groupContainer(appGroupIdentifier) {
             return shared
         }
-        let standalone = privateContainer.appendingPathComponent("NiggagramData", isDirectory: true)
+        let standalone = privateContainer.appendingPathComponent("tearsgramData", isDirectory: true)
         try fileManager.createDirectory(at: standalone, withIntermediateDirectories: true, attributes: nil)
         return standalone
     }

@@ -4,31 +4,53 @@ import AsyncDisplayKit
 import SwiftSignalKit
 import SGSimpleSettings
 
-public func niggagramAppBadgeImage() -> UIImage? {
-    // Match the stock @3x badge (279 x 66 pixels). A wider badge overlaps
-    // the compact Dynamic Island on iPhone 14 Pro / Pro Max.
+/// tearsgram badge shown under the Dynamic Island in screenshots.
+/// Same geometry as the stock badge: 93 x 22 pt (279 x 66 px @3x), so it does
+/// not overlap the compact island on iPhone 14 Pro / Pro Max and later.
+public func tearsgramAppBadgeImage() -> UIImage? {
     let size = CGSize(width: 93.0, height: 22.0)
     UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
     defer { UIGraphicsEndImageContext() }
-    UIColor(red: 0.49, green: 0.22, blue: 0.82, alpha: 1.0).setFill()
-    UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2).fill()
-    if let portrait = UIImage(bundleImageName: "ModPrivacy") {
-        let rect = CGRect(x: 2, y: 2, width: 18, height: 18)
-        UIGraphicsGetCurrentContext()?.saveGState()
-        UIBezierPath(ovalIn: rect).addClip()
-        portrait.draw(in: rect)
-        UIGraphicsGetCurrentContext()?.restoreGState()
+
+    let bounds = CGRect(origin: .zero, size: size)
+    let pill = UIBezierPath(roundedRect: bounds, cornerRadius: size.height / 2.0)
+    pill.addClip()
+
+    // Palette taken from the tearsgram logo: deep forest green -> mint.
+    let deep = UIColor(red: 0.042, green: 0.310, blue: 0.153, alpha: 1.0).cgColor
+    let mid = UIColor(red: 0.086, green: 0.541, blue: 0.267, alpha: 1.0).cgColor
+    if let context = UIGraphicsGetCurrentContext(),
+       let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [deep, mid] as CFArray, locations: [0.0, 1.0]) {
+        context.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: size.width, y: 0.0), options: [])
     }
-    let text = "NIGGAGRAM" as NSString
+
+    // Logo mark: the app icon cropped into a circle when it is bundled,
+    // otherwise a mint disc with the date-appropriate "t".
+    let markRect = CGRect(x: 2.0, y: 2.0, width: 18.0, height: 18.0)
+    UIGraphicsGetCurrentContext()?.saveGState()
+    UIBezierPath(ovalIn: markRect).addClip()
+    if let mark = UIImage(bundleImageName: "TearsgramBadgeMark") {
+        mark.draw(in: markRect)
+    } else {
+        UIColor(red: 0.84, green: 0.96, blue: 0.88, alpha: 1.0).setFill()
+        UIBezierPath(ovalIn: markRect).fill()
+        let glyph = "t" as NSString
+        let glyphFont = UIFont(descriptor: UIFont.systemFont(ofSize: 13.0, weight: .bold).fontDescriptor.withDesign(.serif) ?? UIFont.systemFont(ofSize: 13.0, weight: .bold).fontDescriptor, size: 13.0)
+        let glyphSize = glyph.size(withAttributes: [.font: glyphFont])
+        glyph.draw(at: CGPoint(x: markRect.midX - glyphSize.width / 2.0, y: markRect.midY - glyphSize.height / 2.0 - 0.5), withAttributes: [.font: glyphFont, .foregroundColor: UIColor(red: 0.042, green: 0.310, blue: 0.153, alpha: 1.0)])
+    }
+    UIGraphicsGetCurrentContext()?.restoreGState()
+
+    let text = "tearsgram" as NSString
     let availableWidth = size.width - 24.0 - 4.0
-    var font = UIFont.systemFont(ofSize: 11.0, weight: .semibold)
+    var font = UIFont(descriptor: UIFont.systemFont(ofSize: 11.0, weight: .semibold).fontDescriptor.withDesign(.rounded) ?? UIFont.systemFont(ofSize: 11.0, weight: .semibold).fontDescriptor, size: 11.0)
     let measuredWidth = text.size(withAttributes: [.font: font]).width
     if measuredWidth > availableWidth {
         font = font.withSize(font.pointSize * availableWidth / measuredWidth)
     }
     let textSize = text.size(withAttributes: [.font: font])
     let textRect = CGRect(x: 24.0 + (availableWidth - textSize.width) / 2.0, y: (size.height - textSize.height) / 2.0, width: textSize.width, height: textSize.height)
-    text.draw(in: textRect, withAttributes: [.font: font, .foregroundColor: UIColor.white])
+    text.draw(in: textRect, withAttributes: [.font: font, .foregroundColor: UIColor(red: 0.90, green: 0.98, blue: 0.92, alpha: 1.0)])
     return UIGraphicsGetImageFromCurrentImageContext()
 }
 
@@ -502,11 +524,13 @@ public class Window1 {
     public init(hostView: WindowHostView, statusBarHost: StatusBarHost?) {
         self.hostView = hostView
         self.badgeView = UIImageView()
+        // Empty value (fresh install) means the tearsgram badge. Any saved
+        // stock asset name, including "Components/AppBadge", wins over it.
         let savedBadge = SGSimpleSettings.shared.customAppBadge
-        if !savedBadge.isEmpty && savedBadge != "NiggagramAppBadge", let image = UIImage(bundleImageName: savedBadge) {
+        if !savedBadge.isEmpty, savedBadge != "TearsgramAppBadge", let image = UIImage(bundleImageName: savedBadge) {
             self.badgeView.image = image
         } else {
-            self.badgeView.image = niggagramAppBadgeImage()
+            self.badgeView.image = UIImage(bundleImageName: "TearsgramAppBadge") ?? tearsgramAppBadgeImage()
         }
         self.badgeView.isHidden = true
         

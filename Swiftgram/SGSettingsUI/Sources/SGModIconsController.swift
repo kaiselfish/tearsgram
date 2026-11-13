@@ -90,7 +90,7 @@ public func sgModIconsController(context: AccountContext) -> ViewController {
         } else if alternatives["NGCustom1"] == nil {
             notice = ru ? "Эти иконки появятся после установки новой сборки IPA." : "These icons require installing the updated IPA."
         } else {
-            notice = ru ? "Меняет иконку приложения на рабочем столе. Стандартная возвращает исходный портрет. Верхний значок Niggagram остаётся прежним." : "Changes the Home Screen app icon. Default restores the original portrait. The top Niggagram badge stays unchanged."
+            notice = ru ? "Меняет иконку приложения на рабочем столе. Стандартная возвращает исходный портрет. Верхний значок tearsgram остаётся прежним." : "Changes the Home Screen app icon. Default restores the original portrait. The top tearsgram badge stays unchanged."
         }
         entries.append(.notice(notice))
         let state = ItemListControllerState(presentationData: ItemListPresentationData(data), title: .text(ru ? "Иконка приложения" : "App icon"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: data.strings.Common_Back))

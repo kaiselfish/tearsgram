@@ -6,7 +6,7 @@ public enum SGPrivateActivity {
 
 public enum SGPrivacySettings {
     public static let changed = Notification.Name("Swiftgram.LocalPrivacySettingsChanged")
-    public static let messageSent = Notification.Name("Niggagram.MessageSent")
+    public static let messageSent = Notification.Name("tearsgram.MessageSent")
     public static var selectedAppIconName: String? {
         get {
             let value = UserDefaults.standard.string(forKey: "sg.mod.selectedAppIconName") ?? ""

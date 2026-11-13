@@ -19,7 +19,7 @@ struct SGAppStorageTests {
         precondition(!fm.fileExists(atPath: privateRoot.path), "Shared installs must not create a parallel database")
 
         let standalone = try SGAppStorage.resolve(appGroupIdentifier: group, groupContainer: { _ in nil }, privateContainer: privateRoot)
-        precondition(standalone == privateRoot.appendingPathComponent("NiggagramData", isDirectory: true))
+        precondition(standalone == privateRoot.appendingPathComponent("tearsgramData", isDirectory: true))
         var isDirectory: ObjCBool = false
         precondition(fm.fileExists(atPath: standalone.path, isDirectory: &isDirectory) && isDirectory.boolValue)
         let sentinel = standalone.appendingPathComponent("existing-data")

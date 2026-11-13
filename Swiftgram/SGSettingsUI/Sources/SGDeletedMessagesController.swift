@@ -46,7 +46,7 @@ func sgDeletedMessagesController(context: AccountContext) -> ViewController {
         entries.append(.header(id: counter.count, section: .actions, text: ru ? "Локальный архив · \(messages.count)/\(limitLabel)" : "Local archive · \(messages.count)/\(limitLabel)", badge: nil))
         entries.append(.action(id: counter.count, section: .actions, actionType: .clear, text: ru ? "Очистить архив" : "Clear archive", kind: .destructive))
         if messages.isEmpty {
-            entries.append(.notice(id: counter.count, section: .messages, text: ru ? "Пока нет сохранённых сообщений. Включите удалённые сообщения в разделе Nigga. Восстановить сообщения, которые этот клиент не получал, нельзя." : "No saved messages yet. Enable deleted messages in Nigga settings. Messages this client never received cannot be recovered."))
+            entries.append(.notice(id: counter.count, section: .messages, text: ru ? "Пока нет сохранённых сообщений. Включите удалённые сообщения в разделе tearsgram. Восстановить сообщения, которые этот клиент не получал, нельзя." : "No saved messages yet. Enable deleted messages in tearsgram settings. Messages this client never received cannot be recovered."))
         } else {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: data.strings.baseLanguageCode)

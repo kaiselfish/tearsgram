@@ -7,6 +7,7 @@ import ItemListUI
 import AccountContext
 import SGItemListUI
 import SGSimpleSettings
+import SGProUI
 
 private enum SGModSection: Int32, SGItemListSection {
     case appearance
@@ -25,6 +26,7 @@ private enum SGModLink: Hashable {
     case archive
     case pseudoPro
     case icons
+    case appBadge
 }
 
 private typealias SGModEntry = SGItemListUIEntry<SGModSection, SGModToggle, String, String, SGModLink, String>
@@ -100,6 +102,10 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             pushImpl?(context.sharedContext.makeSGProController(context: context))
         case .icons:
             pushImpl?(sgModIconsController(context: context))
+        case .appBadge:
+            if #available(iOS 14.0, *) {
+                pushImpl?(sgAppBadgeSettingsController(context: context))
+            }
         }
     }, action: { action in
         if action == "saveArchiveLimit", let limit = Int(archiveLimitInput), (1 ... 10000).contains(limit) {
@@ -120,6 +126,9 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         var entries: [SGModEntry] = []
         entries.append(.header(id: counter.count, section: .appearance, text: ru ? "Оформление" : "Appearance", badge: nil))
         entries.append(.disclosure(id: counter.count, section: .appearance, link: .icons, text: ru ? "Иконка приложения" : "App icon"))
+        if #available(iOS 14.0, *) {
+            entries.append(.disclosure(id: counter.count, section: .appearance, link: .appBadge, text: ru ? "Значок приложения" : "App badge"))
+        }
         entries.append(.header(id: counter.count, section: .pseudoPro, text: "Swiftpseudo-Pro", badge: nil))
         entries.append(.toggle(id: counter.count, section: .pseudoPro, settingName: .pseudoPro, value: SGPrivacySettings.swiftpseudoPro, text: "Swiftpseudo-Pro", enabled: true))
         if SGPrivacySettings.swiftpseudoPro {
@@ -154,7 +163,7 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         entries.append(.header(id: counter.count, section: .voice, text: ru ? "Голосовые сообщения" : "Voice messages", badge: nil))
         entries.append(.oneFromManySelector(id: counter.count, section: .voice, settingName: "voiceEffect", text: ru ? "Войсченджер" : "Voice changer", value: SGPrivacySettings.voiceEffect.title(russian: ru), enabled: true))
         entries.append(.notice(id: counter.count, section: .voice, text: ru ? "Эффект применяется к новым голосовым сообщениям и слышен в предпрослушивании перед отправкой. «Женский голос» повышает тон и осветляет тембр; результат зависит от исходного голоса. Выберите «Без эффекта», чтобы выключить. Уже записанные фрагменты, кружки и звонки не меняются." : "Applies to new voice recordings and is audible in the preview before sending. Female voice raises pitch and brightens the tone; the result depends on your original voice. Select Off to disable. Existing recorded segments, video messages and calls are unchanged."))
-        let state = ItemListControllerState(presentationData: ItemListPresentationData(data), title: .text("Nigga"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: data.strings.Common_Back))
+        let state = ItemListControllerState(presentationData: ItemListPresentationData(data), title: .text("tearsgram"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: data.strings.Common_Back))
         return (state, (ItemListNodeState(presentationData: ItemListPresentationData(data), entries: entries, style: .blocks, ensureVisibleItemTag: nil), arguments))
     }
     let controller = ItemListController(context: context, state: signal)

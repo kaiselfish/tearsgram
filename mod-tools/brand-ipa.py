@@ -1,12 +1,12 @@
-"""Set the install identity in the IPA that will be signed by the user's signing tool."""
+"""Set the tearsgram install identity in the IPA that will be signed by the user's signing tool."""
 import argparse
 import plistlib
 import re
 import zipfile
 from pathlib import Path, PurePosixPath
 
-BUNDLE_ID = "ph.nigga.graph"
-APP_NAME = "Niggagram"
+BUNDLE_ID = "com.tearsgram.app"
+APP_NAME = "tearsgram"
 CUSTOM_ICONS = ("NGCustom1", "NGCustom2", "NGCustom3")
 ICON_DIRECTORY = Path(__file__).resolve().parent / "app-icons"
 

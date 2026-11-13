@@ -212,7 +212,7 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     let sgWebSettings = context.currentAppConfiguration.with({ $0 }).sgWebSettings
     items[.swiftgram]!.append(contentsOf: sgPeerInfoSettingsItems(context: context, paymentsEnabled: sgWebSettings.global.paymentsEnabled, presentationData: presentationData, interaction: interaction))
     //
-    items[.modPrivacy]!.append(PeerInfoScreenDisclosureItem(id: 0, text: "Nigga", icon: PresentationResourcesSettings.modPrivacy, action: {
+    items[.modPrivacy]!.append(PeerInfoScreenDisclosureItem(id: 0, text: "tearsgram", icon: PresentationResourcesSettings.modPrivacy, action: {
         interaction.openSettings(.modPrivacy)
     }))
 

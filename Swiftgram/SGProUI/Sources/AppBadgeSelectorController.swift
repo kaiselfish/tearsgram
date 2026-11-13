@@ -8,6 +8,10 @@ import Display
 import TelegramPresentationData
 import AccountContext
 
+/// Sentinel asset name for the built-in tearsgram badge. It is not an
+/// xcassets image: the image comes from `TearsgramAppBadge` or, if the asset
+/// is missing from the bundle, from the runtime renderer in Display.
+let tearsgramAppBadgeAssetName = "TearsgramAppBadge"
 
 struct AppBadge: Identifiable, Hashable {
     var id: String { assetName }
@@ -17,8 +21,8 @@ struct AppBadge: Identifiable, Hashable {
 
 func getAvailableAppBadges() -> [AppBadge] {
     var appBadges: [AppBadge] = [
-        .init(displayName: "Niggagram", assetName: "NiggagramAppBadge"),
-        .init(displayName: "Default", assetName: "Components/AppBadge"),
+        .init(displayName: "tearsgram", assetName: tearsgramAppBadgeAssetName),
+        .init(displayName: "Swiftgram (Default)", assetName: "Components/AppBadge"),
         .init(displayName: "Sky", assetName: "SkyAppBadge"),
         .init(displayName: "Night", assetName: "NightAppBadge"),
         .init(displayName: "Titanium", assetName: "TitaniumAppBadge"),
@@ -29,21 +33,29 @@ func getAvailableAppBadges() -> [AppBadge] {
     if SGSimpleSettings.shared.duckyAppIconAvailable || SGPrivacySettings.swiftpseudoPro {
         appBadges.append(.init(displayName: "Ducky", assetName: "DuckyAppBadge"))
     }
-    appBadges += [
-        .init(displayName: "Sparkling", assetName: "SparklingAppBadge"),
-    ]
+    appBadges.append(.init(displayName: "Sparkling", assetName: "SparklingAppBadge"))
 
     return appBadges
 }
-    
+
+/// Resolves a badge asset name to an image. The tearsgram badge exists both as
+/// a compiled asset and as a runtime fallback, so a stripped or missing
+/// Images.xcassets entry cannot leave the status bar without a badge.
+func appBadgeImage(for assetName: String) -> UIImage? {
+    if assetName == tearsgramAppBadgeAssetName {
+        return UIImage(bundleImageName: tearsgramAppBadgeAssetName) ?? tearsgramAppBadgeImage()
+    }
+    return UIImage(bundleImageName: assetName)
+}
+
 @available(iOS 14.0, *)
 struct AppBadgeSettingsView: View {
     weak var wrapperController: LegacyController?
     let context: AccountContext
-    
+
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.lang) var lang: String
-    
+
     @State var selectedBadge: AppBadge
     let availableAppBadges: [AppBadge] = getAvailableAppBadges()
 
@@ -57,32 +69,30 @@ struct AppBadgeSettingsView: View {
     private var columns: [SwiftUI.GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: Layout.columnSpacing), count: 2)
     }
-    
+
     init(wrapperController: LegacyController?, context: AccountContext) {
         self.wrapperController = wrapperController
         self.context = context
-        
-        for badge in self.availableAppBadges {
-            if badge.assetName == SGSimpleSettings.shared.customAppBadge {
-                self._selectedBadge = State(initialValue: badge)
-                return
-            }
+
+        let savedAssetName = SGSimpleSettings.shared.customAppBadge
+        let normalizedAssetName = savedAssetName.isEmpty ? tearsgramAppBadgeAssetName : savedAssetName
+        if let badge = getAvailableAppBadges().first(where: { $0.assetName == normalizedAssetName }) {
+            self._selectedBadge = State(initialValue: badge)
+        } else {
+            self._selectedBadge = State(initialValue: getAvailableAppBadges().first!)
         }
-        
-        self._selectedBadge = State(initialValue: self.availableAppBadges.first!)
     }
-    
+
     private func onSelectBadge(_ badge: AppBadge) {
-        if SGPrivacySettings.allowsLocalPro(status: self.context.sharedContext.immediateSGStatus.status) {
-            let image = badge.assetName == "NiggagramAppBadge" ? niggagramAppBadgeImage() : UIImage(bundleImageName: badge.assetName)
-            DispatchQueue.main.async {
-                self.selectedBadge = badge
-                SGSimpleSettings.shared.customAppBadge = badge.assetName
-                self.context.sharedContext.mainWindow?.badgeView.image = image
-            }
+        let image = appBadgeImage(for: badge.assetName)
+        DispatchQueue.main.async {
+            self.selectedBadge = badge
+            SGSimpleSettings.shared.customAppBadge = badge.assetName
+            SGSimpleSettings.shared.synchronizeShared()
+            self.context.sharedContext.mainWindow?.badgeView.image = image
         }
     }
-    
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, alignment: .center, spacing: Layout.columnSpacing) {
@@ -91,7 +101,7 @@ struct AppBadgeSettingsView: View {
                         onSelectBadge(badge)
                     } label: {
                         VStack(spacing: 8) {
-                            Image(uiImage: (badge.assetName == "NiggagramAppBadge" ? niggagramAppBadgeImage() : UIImage(bundleImageName: badge.assetName)) ?? UIImage())
+                            Image(uiImage: appBadgeImage(for: badge.assetName) ?? UIImage())
                                 .resizable()
                                 .scaledToFit()
                                 .frame(height: Layout.imageHeight)
@@ -114,11 +124,9 @@ struct AppBadgeSettingsView: View {
             }
             .padding(.horizontal, Layout.horizontalPadding)
             .padding(.vertical, 24)
-
         }
         .background(Color(colorScheme == .light ? .secondarySystemBackground : .systemBackground).ignoresSafeArea())
     }
-    
 }
 
 @available(iOS 14.0, *)
@@ -135,7 +143,7 @@ public func sgAppBadgeSettingsController(context: AccountContext, presentationDa
     legacyController.statusBar.statusBarStyle = theme.rootController
         .statusBarStyle.style
     legacyController.title = "AppBadge.Title".i18n(strings.baseLanguageCode)
-    
+
     let swiftUIView = SGSwiftUIView<AppBadgeSettingsView>(
         legacyController: legacyController,
         manageSafeArea: true,
