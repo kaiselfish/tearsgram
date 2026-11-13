@@ -16,28 +16,28 @@ public func tearsgramAppBadgeImage() -> UIImage? {
     let pill = UIBezierPath(roundedRect: bounds, cornerRadius: size.height / 2.0)
     pill.addClip()
 
-    // Palette taken from the tearsgram logo: deep forest green -> mint.
-    let deep = UIColor(red: 0.042, green: 0.310, blue: 0.153, alpha: 1.0).cgColor
-    let mid = UIColor(red: 0.086, green: 0.541, blue: 0.267, alpha: 1.0).cgColor
+    // Palette taken from the artwork: pale blue paper with deep green ink.
+    let top = UIColor(red: 0.918, green: 0.953, blue: 0.988, alpha: 1.0).cgColor
+    let bottom = UIColor(red: 0.776, green: 0.867, blue: 0.953, alpha: 1.0).cgColor
     if let context = UIGraphicsGetCurrentContext(),
-       let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [deep, mid] as CFArray, locations: [0.0, 1.0]) {
+       let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [top, bottom] as CFArray, locations: [0.0, 1.0]) {
         context.drawLinearGradient(gradient, start: CGPoint(x: 0.0, y: 0.0), end: CGPoint(x: size.width, y: 0.0), options: [])
     }
 
-    // Logo mark: the app icon cropped into a circle when it is bundled,
-    // otherwise a mint disc with the date-appropriate "t".
+    // Logo mark: the artwork disc when it is bundled, otherwise a white disc
+    // with a green serif "t" that matches the wordmark.
     let markRect = CGRect(x: 2.0, y: 2.0, width: 18.0, height: 18.0)
     UIGraphicsGetCurrentContext()?.saveGState()
     UIBezierPath(ovalIn: markRect).addClip()
     if let mark = UIImage(bundleImageName: "TearsgramBadgeMark") {
         mark.draw(in: markRect)
     } else {
-        UIColor(red: 0.84, green: 0.96, blue: 0.88, alpha: 1.0).setFill()
+        UIColor(red: 0.98, green: 0.99, blue: 1.0, alpha: 1.0).setFill()
         UIBezierPath(ovalIn: markRect).fill()
         let glyph = "t" as NSString
         let glyphFont = UIFont(descriptor: UIFont.systemFont(ofSize: 13.0, weight: .bold).fontDescriptor.withDesign(.serif) ?? UIFont.systemFont(ofSize: 13.0, weight: .bold).fontDescriptor, size: 13.0)
         let glyphSize = glyph.size(withAttributes: [.font: glyphFont])
-        glyph.draw(at: CGPoint(x: markRect.midX - glyphSize.width / 2.0, y: markRect.midY - glyphSize.height / 2.0 - 0.5), withAttributes: [.font: glyphFont, .foregroundColor: UIColor(red: 0.042, green: 0.310, blue: 0.153, alpha: 1.0)])
+        glyph.draw(at: CGPoint(x: markRect.midX - glyphSize.width / 2.0, y: markRect.midY - glyphSize.height / 2.0 - 0.5), withAttributes: [.font: glyphFont, .foregroundColor: UIColor(red: 0.071, green: 0.290, blue: 0.157, alpha: 1.0)])
     }
     UIGraphicsGetCurrentContext()?.restoreGState()
 
@@ -50,7 +50,7 @@ public func tearsgramAppBadgeImage() -> UIImage? {
     }
     let textSize = text.size(withAttributes: [.font: font])
     let textRect = CGRect(x: 24.0 + (availableWidth - textSize.width) / 2.0, y: (size.height - textSize.height) / 2.0, width: textSize.width, height: textSize.height)
-    text.draw(in: textRect, withAttributes: [.font: font, .foregroundColor: UIColor(red: 0.90, green: 0.98, blue: 0.92, alpha: 1.0)])
+    text.draw(in: textRect, withAttributes: [.font: font, .foregroundColor: UIColor(red: 0.071, green: 0.290, blue: 0.157, alpha: 1.0)])
     return UIGraphicsGetImageFromCurrentImageContext()
 }
 

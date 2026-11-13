@@ -106,11 +106,19 @@ python tools/apply.py
 Перегенерировать графику (если заменил `branding/logo.png`):
 
 ```bash
+python tools/make_artwork.py    # только если нужно перерисовать сам коллаж с нуля
 python tools/make_branding.py
 ```
 
+`tools/make_artwork.py` рисует ключевой арт «Silk Road» (бледно-голубое поле, зелёный
+серифный заголовок, фигура в полосатой рубашке с полосой на глазах, призрачная рука справа,
+зелёная птица на плече) в `branding/logo.png` 1024×1024. Если есть исходная картинка —
+просто положи её как `branding/logo.png` и запускай только `make_branding.py`.
+
 Скрипт собирает: `branding/AppIcon-1024.png`, `mod-tools/app-icons/NGCustom*`,
-`Swiftgram/SGAppBadgeAssets/Images.xcassets/TearsgramAppBadge.imageset/*`.
+`Swiftgram/SGAppBadgeAssets/Images.xcassets/TearsgramAppBadge.imageset/*`
+(бледно-голубая плашка 279×66 px @3x, круглая миниатюра арта слева, зелёная надпись
+`tearsgram` справа).
 
 ```bash
 git add -A
