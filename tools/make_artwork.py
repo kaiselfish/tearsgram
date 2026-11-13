@@ -103,7 +103,7 @@ def letterspaced(text: str, f: ImageFont.FreeTypeFont, tracking: int, fill: tupl
 
 def wordmark(canvas: Image.Image) -> None:
     draw = ImageDraw.Draw(canvas)
-    f = fit_font("Silk Road", 850, 260, bold=True)
+    f = fit_font("Silk Road", 762, 260, bold=True)
     text = "Silk Road"
     box = f.getbbox(text)
     x = (SIZE - (box[2] - box[0])) // 2 - box[0]
