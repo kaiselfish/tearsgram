@@ -196,6 +196,7 @@ def fit_badge_font(draw: ImageDraw.ImageDraw, text: str, max_width: int, start: 
 def build_photo_badge(
     source: Path,
     *,
+    text: str | None = None,
     scrim: int = 0,
     white: int = 0,
     chip: bool = False,
@@ -203,12 +204,12 @@ def build_photo_badge(
     stroke: int = 0,
     stroke_fill: tuple[int, int, int] = (255, 255, 255),
 ) -> Image.Image:
-    """Full-bleed photo badge: the image fills the pill, the wordmark sits on top.
+    """Image badge: the picture fills the pill, optional wordmark on top.
 
+    text  - None keeps the badge as a pure picture, no lettering
     scrim - how much black to lay over the photo (0-255) so white text reads
     white - how much white to lay over the photo (for dark-on-light artwork)
     chip  - draw a dark rounded plate behind the text
-    stroke - outline width for the glyphs, for busy backgrounds
     """
     width, height = 279, 66
     photo = cover(Image.open(source).convert("RGB"), (width, height)).convert("RGBA")
@@ -222,8 +223,9 @@ def build_photo_badge(
 
     draw = ImageDraw.Draw(badge)
     draw.rounded_rectangle((1, 1, width - 2, height - 2), radius=(height - 2) // 2, outline=(255, 255, 255, 46), width=2)
+    if not text:
+        return badge
 
-    text = "tearsgram"
     font = fit_badge_font(draw, text, width - 46)
     box = draw.textbbox((0, 0), text, font=font)
     text_width = box[2] - box[0]
@@ -301,30 +303,12 @@ def main() -> int:
     save_badge_imageset(badge, "TearsgramAppBadge")
 
     if TWILIGHT_SOURCE.exists():
-        save_badge_imageset(
-            build_photo_badge(
-                TWILIGHT_SOURCE,
-                scrim=40,
-                text_fill=(255, 255, 255),
-                stroke=2,
-                stroke_fill=(6, 10, 14),
-            ),
-            "TearsgramTwilightBadge",
-        )
+        save_badge_imageset(build_photo_badge(TWILIGHT_SOURCE), "TearsgramTwilightBadge")
     else:
         print("  branding/twilight.png not found, skipping the twilight badge")
 
     if TROLLFACE_SOURCE.exists():
-        save_badge_imageset(
-            build_photo_badge(
-                TROLLFACE_SOURCE,
-                white=74,
-                text_fill=(12, 12, 14),
-                stroke=3,
-                stroke_fill=(255, 255, 255),
-            ),
-            "TearsgramTrollfaceBadge",
-        )
+        save_badge_imageset(build_photo_badge(TROLLFACE_SOURCE), "TearsgramTrollfaceBadge")
     else:
         print("  branding/trollface.png not found, skipping the trollface badge")
 

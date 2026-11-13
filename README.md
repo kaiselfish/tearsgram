@@ -45,10 +45,12 @@
 
 1. Брендинг: `CFBundleDisplayName`/`CFBundleName` = `tearsgram` во всех таргетах и расширениях,
    bundle id `com.tearsgram.app`, свои иконки и альтернативные иконки.
-2. Значок над Dynamic Island `tearsgram`: зелёная пилюля с логотипом и надписью, 93×22 pt
-   (279×66 px @3x) — ровно как штатный, чтобы не заезжать под остров на 14 Pro / 15 / 16 / 17.
-3. Переключатель значка в настройках: `tearsgram` ↔ штатные Swiftgram/Telegram
-   (`Default`, `Sky`, `Night`, `Titanium`, `Pro`, `Day`, `Sparkling`, `Ducky`).
+2. Значок над Dynamic Island: три варианта по 93×22 pt (279×66 px @3x) — ровно как
+   штатный, чтобы не заезжать под остров на 14 Pro / 15 / 16 / 17: `tearsgram`
+   (чёрная плашка + белый серифный текст), `Twilight` и `Trollface`
+   (только картинки, без надписей).
+3. Переключатель значка в настройках: `tearsgram`, `Twilight`, `Trollface` ↔ штатные
+   Swiftgram/Telegram (`Default`, `Sky`, `Night`, `Titanium`, `Pro`, `Day`, `Sparkling`, `Ducky`).
 4. Экран настроек мода переименован из `Nigga` в `tearsgram`, ссылка «Значок приложения»
    вынесена в раздел «Оформление» без требования Pro.
 5. Точка входа в этот экран. В upstream у `sgModSettingsController` **нет ни одного вызова** —
@@ -121,11 +123,11 @@ LANCZOS + UnsharpMask, поэтому исходник меньше 1024 px не
 Скрипт собирает: `branding/AppIcon-1024.png`, `mod-tools/app-icons/NGCustom*`,
 `Swiftgram/SGAppBadgeAssets/Images.xcassets/TearsgramAppBadge.imageset/*`
 (чёрная плашка 279×66 px @3x с белой надписью `tearsgram`, без миниатюры —
-93×22 pt под Dynamic Island), а также два фото-бейджа из `branding/twilight.png`
-и `branding/trollface.png` (`TearsgramTwilightBadge.imageset`,
-`TearsgramTrollfaceBadge.imageset`): картинка заливает всю плашку, сверху
-надпись `tearsgram` — белая с обводкой на закате, чёрная с белой обводкой на
-троллфейсах.
+93×22 pt под Dynamic Island), а также два чисто графических бейджа из
+`branding/twilight.png` и `branding/trollface.png`
+(`TearsgramTwilightBadge.imageset`, `TearsgramTrollfaceBadge.imageset`):
+картинка cover-обрезкой заливает всю плашку, никакого текста поверх нет —
+только скругление по пилюле и тонкая светлая окантовка 2 px.
 
 Все три бейджа выбираются в приложении: `Настройки → Swiftgram → tearsgram →
 Значок приложения` (`tearsgram`, `Twilight`, `Trollface`, затем стоковые).
