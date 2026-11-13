@@ -380,6 +380,14 @@ def verify(repo: Path) -> list[str]:
     if not badge_asset.is_dir():
         problems.append("TearsgramAppBadge.imageset is missing; run python tools/make_branding.py")
 
+    for extra in ("TearsgramTwilightBadge", "TearsgramTrollfaceBadge"):
+        asset = repo / f"Swiftgram/SGAppBadgeAssets/Images.xcassets/{extra}.imageset"
+        if not asset.is_dir():
+            problems.append(f"{extra}.imageset is missing; run python tools/make_branding.py")
+        selector = repo / "Swiftgram/SGProUI/Sources/AppBadgeSelectorController.swift"
+        if selector.is_file() and f'"{extra}"' not in read(selector):
+            problems.append(f"AppBadgeSelectorController.swift: {extra} is not listed")
+
     settings = repo / "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift"
     if settings.is_file():
         text = read(settings)

@@ -121,7 +121,15 @@ LANCZOS + UnsharpMask, поэтому исходник меньше 1024 px не
 Скрипт собирает: `branding/AppIcon-1024.png`, `mod-tools/app-icons/NGCustom*`,
 `Swiftgram/SGAppBadgeAssets/Images.xcassets/TearsgramAppBadge.imageset/*`
 (чёрная плашка 279×66 px @3x с белой надписью `tearsgram`, без миниатюры —
-93×22 pt под Dynamic Island).
+93×22 pt под Dynamic Island), а также два фото-бейджа из `branding/twilight.png`
+и `branding/trollface.png` (`TearsgramTwilightBadge.imageset`,
+`TearsgramTrollfaceBadge.imageset`): картинка заливает всю плашку, сверху
+надпись `tearsgram` — белая с обводкой на закате, чёрная с белой обводкой на
+троллфейсах.
+
+Все три бейджа выбираются в приложении: `Настройки → Swiftgram → tearsgram →
+Значок приложения` (`tearsgram`, `Twilight`, `Trollface`, затем стоковые).
+Выбор пишется в `customAppBadge` и применяется сразу.
 
 ```bash
 git add -A
