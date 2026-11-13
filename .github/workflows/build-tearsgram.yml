@@ -6,6 +6,9 @@ on:
     paths:
       - versions.json
       - .github/workflows/build-tearsgram.yml
+      - branding/**
+      - mod-tools/app-icons/**
+      - Swiftgram/SGAppBadgeAssets/**
   workflow_dispatch:
     inputs:
       mode:
