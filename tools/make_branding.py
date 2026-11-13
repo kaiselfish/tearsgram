@@ -104,69 +104,56 @@ def default_logo() -> Image.Image:
 
 
 def build_icon(logo: Image.Image) -> Image.Image:
-    if logo.size == (1024, 1024):
-        return logo.convert("RGB")
-    return cover(logo.convert("RGB"), (1024, 1024))
+    source = logo.convert("RGB")
+    if source.size == (1024, 1024):
+        return source
+    scaled = cover(source, (1024, 1024))
+    if source.width < 1024 or source.height < 1024:
+        # Branding sources are usually smaller than the master; sharpen the
+        # upscale so the icon does not look soft next to stock apps.
+        scaled = scaled.filter(ImageFilter.UnsharpMask(radius=1.6, percent=55, threshold=2))
+    return scaled
 
 
 def build_badge(logo: Image.Image) -> Image.Image:
-    """Pale-blue pill with the artwork cropped into a disc and green wordmark."""
+    """Near-black pill with the white tearsgram wordmark and no thumbnail."""
     width, height = 279, 66
     badge = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(badge)
 
     gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     pixels = gradient.load()
     for x in range(width):
         t = x / (width - 1)
-        t = t ** 0.9
-        pixels_row = (
-            round(SKY_TOP[0] + (SKY_BOTTOM[0] - SKY_TOP[0]) * t),
-            round(SKY_TOP[1] + (SKY_BOTTOM[1] - SKY_TOP[1]) * t),
-            round(SKY_TOP[2] + (SKY_BOTTOM[2] - SKY_TOP[2]) * t),
-            255,
-        )
         for y in range(height):
-            pixels[x, y] = pixels_row
+            v = y / (height - 1)
+            pixels[x, y] = (
+                round(30 - 12 * v),
+                round(30 - 12 * v),
+                round(32 - 12 * v),
+                255,
+            )
 
     mask = Image.new("L", (width, height), 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, width - 1, height - 1), radius=height // 2, fill=255)
     badge.paste(gradient, (0, 0), mask)
-    draw.rounded_rectangle((1, 1, width - 2, height - 2), radius=(height - 2) // 2, outline=MID + (110,), width=2)
 
-    # The artwork itself, cropped into a disc on the left. The crop is centred
-    # on the masked bust so the disc reads as a portrait and not as squashed
-    # title text at 18 pt.
-    mark_size = 54
-    mark_box = (6, (height - mark_size) // 2)
-    source = logo.convert("RGB")
-    side = int(min(source.width, source.height) * 0.56)
-    cx = source.width // 2
-    cy = min(source.height, int(source.height * 0.70))
-    left = max(0, min(source.width - side, cx - side // 2))
-    top = max(0, min(source.height - side, cy - side // 2))
-    mark = cover(source.crop((left, top, left + side, top + side)), (mark_size, mark_size)).convert("RGBA")
-    mark_mask = Image.new("L", (mark_size, mark_size), 0)
-    ImageDraw.Draw(mark_mask).ellipse((0, 0, mark_size - 1, mark_size - 1), fill=255)
-    badge.paste(mark, mark_box, mark_mask)
-    draw.ellipse(
-        (mark_box[0], mark_box[1], mark_box[0] + mark_size - 1, mark_box[1] + mark_size - 1),
-        outline=(255, 255, 255, 235),
-        width=2,
-    )
+    draw = ImageDraw.Draw(badge)
+    # Hairline rim, like the system badge.
+    draw.rounded_rectangle((1, 1, width - 2, height - 2), radius=(height - 2) // 2, outline=(255, 255, 255, 30), width=2)
 
-    font = load_font(34, bold=True)
+    draw = ImageDraw.Draw(badge)
+    font = load_font(36, bold=True)
     text = "tearsgram"
     box = draw.textbbox((0, 0), text, font=font)
     text_width = box[2] - box[0]
-    available = width - (mark_box[0] + mark_size + 10) - 10
+    available = width - 44
     while text_width > available and font.size > 12:
         font = load_font(font.size - 1, bold=True)
         box = draw.textbbox((0, 0), text, font=font)
         text_width = box[2] - box[0]
-    x = mark_box[0] + mark_size + 10 + (available - text_width) // 2 - box[0]
+    x = (width - text_width) // 2 - box[0]
     y = (height - (box[3] - box[1])) // 2 - box[1]
-    draw.text((x, y), text, font=font, fill=DEEP + (255,))
+    draw.text((x, y), text, font=font, fill=(246, 247, 249, 255))
     return badge
 
 
