@@ -40,6 +40,7 @@ private let sgMaximumMessageAge: Int32 = 300
 private final class SGBackgroundSilenceAudio {
     private var player: AVAudioPlayer?
     private var session: AVAudioSession?
+    private var interruptionObserver: NSObjectProtocol?
 
     func start() {
         if self.player != nil {
@@ -60,7 +61,9 @@ private final class SGBackgroundSilenceAudio {
         do {
             let player = try AVAudioPlayer(contentsOf: url)
             player.numberOfLoops = -1
-            player.volume = 0.0
+            // The file itself is all-zero samples, so full volume is still silence
+            // and iOS keeps the audio session (and the process) alive.
+            player.volume = 1.0
             player.prepareToPlay()
             guard player.play() else {
                 sgLocalNotificationLog("silent player refused to start")
@@ -69,6 +72,7 @@ private final class SGBackgroundSilenceAudio {
             }
             self.player = player
             self.session = session
+            self.observeInterruptions()
             sgLocalNotificationLog("background keep-alive audio started")
         } catch {
             sgLocalNotificationLog("silent player failed: \(error)")
@@ -76,7 +80,49 @@ private final class SGBackgroundSilenceAudio {
         }
     }
 
+    /// A phone call or an alarm deactivates the session; without this the process
+    /// loses its audio background mode and is suspended after the interruption.
+    private func observeInterruptions() {
+        guard self.interruptionObserver == nil else {
+            return
+        }
+        self.interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: OperationQueue.main,
+            using: { [weak self] notification in
+                guard let self else {
+                    return
+                }
+                guard let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                    let type = AVAudioSession.InterruptionType(rawValue: rawType)
+                else {
+                    return
+                }
+                switch type {
+                case .began:
+                    sgLocalNotificationLog("audio interrupted")
+                case .ended:
+                    guard let self.player, self.session != nil else {
+                        return
+                    }
+                    try? self.session?.setActive(true)
+                    if !self.player.isPlaying {
+                        _ = self.player.play()
+                    }
+                    sgLocalNotificationLog("audio resumed after interruption")
+                @unknown default:
+                    break
+                }
+            }
+        )
+    }
+
     func stop() {
+        if let observer = self.interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+            self.interruptionObserver = nil
+        }
         self.player?.stop()
         self.player = nil
         let session = self.session
@@ -115,31 +161,31 @@ private final class SGBackgroundSilenceAudio {
         let payloadBytes = frames * 2
         var data = Data(capacity: 44 + payloadBytes)
 
-        func append(_ value: UInt32) {
+        func appendUInt32(_ value: UInt32) {
             var littleEndian = value.littleEndian
             withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
         }
-        func append(_ value: UInt16) {
+        func appendUInt16(_ value: UInt16) {
             var littleEndian = value.littleEndian
             withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
         }
-        func append(_ ascii: String) {
+        func appendASCII(_ ascii: String) {
             data.append(contentsOf: Array(ascii.utf8))
         }
 
-        append("RIFF")
-        append(UInt32(36 + payloadBytes))
-        append("WAVE")
-        append("fmt ")
-        append(UInt32(16))
-        append(UInt16(1))
-        append(UInt16(1))
-        append(UInt32(sampleRate))
-        append(UInt32(sampleRate * 2))
-        append(UInt16(2))
-        append(UInt16(16))
-        append("data")
-        append(UInt32(payloadBytes))
+        appendASCII("RIFF")
+        appendUInt32(UInt32(36 + payloadBytes))
+        appendASCII("WAVE")
+        appendASCII("fmt ")
+        appendUInt32(UInt32(16))
+        appendUInt16(UInt16(1))
+        appendUInt16(UInt16(1))
+        appendUInt32(UInt32(sampleRate))
+        appendUInt32(UInt32(sampleRate * 2))
+        appendUInt16(UInt16(2))
+        appendUInt16(UInt16(16))
+        appendASCII("data")
+        appendUInt32(UInt32(payloadBytes))
         data.append(Data(count: payloadBytes))
         return data
     }
@@ -372,7 +418,7 @@ final class SGLocalNotificationManager {
         if lastIds != stored {
             UserDefaults.standard.set(lastIds, forKey: storeKey)
         }
-        if totalUnread > 0, #available(iOS 16.0, *) {
+        if #available(iOS 16.0, *), totalUnread > 0 {
             UNUserNotificationCenter.current().setBadgeCount(Int(totalUnread), withCompletionHandler: nil)
         }
         if delivered > 0 {
