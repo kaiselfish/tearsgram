@@ -179,6 +179,6 @@ public enum SGPrivacySettings {
         guard parts.count == 2, let start = Int(parts[0]), let end = Int(parts[1]) else {
             return russian ? "Выкл" : "Off"
         }
-        return String(format: "%02d:00 – %02d:00", start, end)
+        return String(format: "%02d:00 - %02d:00", start, end)
     }
 }

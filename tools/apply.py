@@ -371,7 +371,7 @@ QUIET_HOURS_SETTINGS_NEW = """    /// Keeps the process running in the backgroun
         guard parts.count == 2, let start = Int(parts[0]), let end = Int(parts[1]) else {
             return russian ? "Выкл" : "Off"
         }
-        return String(format: "%02d:00 – %02d:00", start, end)
+        return String(format: "%02d:00 - %02d:00", start, end)
     }
 }"""
 
@@ -399,6 +399,11 @@ def patch_local_notification_settings(repo: Path) -> bool:
     if "sg.mod.quietHours" not in text:
         require(QUIET_HOURS_SETTINGS_OLD in text, f"{path}: backgroundKeepAlive block not found")
         text = text.replace(QUIET_HOURS_SETTINGS_OLD, QUIET_HOURS_SETTINGS_NEW, 1)
+        changed = True
+    # The label is compared by the unit tests, so keep it ASCII-only.
+    old_label = 'String(format: "%02d:00 \u2013 %02d:00"'
+    if old_label in text:
+        text = text.replace(old_label, 'String(format: "%02d:00 - %02d:00"', 1)
         changed = True
     if changed:
         write(path, text)
@@ -479,10 +484,10 @@ QUIET_HOURS_SHEET_NEW = """    }, setOneFromManyValue: { setting in
             let sheet = ActionSheetController(presentationData: data)
             let options: [(value: String, title: String)] = [
                 (value: "off", title: ru ? "Выкл" : "Off"),
-                (value: "23-8", title: "23:00 – 08:00"),
-                (value: "22-7", title: "22:00 – 07:00"),
-                (value: "0-7", title: "00:00 – 07:00"),
-                (value: "1-9", title: "01:00 – 09:00")
+                (value: "23-8", title: "23:00 - 08:00"),
+                (value: "22-7", title: "22:00 - 07:00"),
+                (value: "0-7", title: "00:00 - 07:00"),
+                (value: "1-9", title: "01:00 - 09:00")
             ]
             var items: [ActionSheetItem] = options.map { option in
                 ActionSheetButtonItem(title: option.title, color: .accent, action: { [weak sheet] in
@@ -577,6 +582,15 @@ def patch_quiet_hours_ui(repo: Path) -> bool:
         "quiet hours rows",
         marker='settingName: "quietHours"',
     )
+
+    # Keep the sheet titles ASCII-only so they match the settings label.
+    if "\u2013" in text:
+        repaired: list[str] = []
+        for line in text.splitlines(keepends=True):
+            if 'title: "' in line:
+                line = line.replace("\u2013", "-")
+            repaired.append(line)
+        text = "".join(repaired)
 
     if text != original:
         write(path, text)

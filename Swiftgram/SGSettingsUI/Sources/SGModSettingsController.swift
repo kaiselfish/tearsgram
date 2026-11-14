@@ -89,10 +89,10 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             let sheet = ActionSheetController(presentationData: data)
             let options: [(value: String, title: String)] = [
                 (value: "off", title: ru ? "Выкл" : "Off"),
-                (value: "23-8", title: "23:00 – 08:00"),
-                (value: "22-7", title: "22:00 – 07:00"),
-                (value: "0-7", title: "00:00 – 07:00"),
-                (value: "1-9", title: "01:00 – 09:00")
+                (value: "23-8", title: "23:00 - 08:00"),
+                (value: "22-7", title: "22:00 - 07:00"),
+                (value: "0-7", title: "00:00 - 07:00"),
+                (value: "1-9", title: "01:00 - 09:00")
             ]
             var items: [ActionSheetItem] = options.map { option in
                 ActionSheetButtonItem(title: option.title, color: .accent, action: { [weak sheet] in
