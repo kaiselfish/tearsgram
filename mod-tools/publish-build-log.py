@@ -1,10 +1,10 @@
-"""Publish the tail of the Bazel compile log into the `ci-logs` branch.
+"""Publish the step logs of a failed run into the `ci-logs` branch.
 
 Workflow job logs are not downloadable through the API without repository admin
 rights (`403 Must have admin rights to Repository`), and the run page only shows
 them to a signed-in owner. The `ci-logs` branch is readable by anyone through
-`raw.githubusercontent.com`, which is not rate limited, so a failed
-`Compile iPhone IPA` step copies its diagnostics there.
+`raw.githubusercontent.com`, which is not rate limited, so a failed run copies
+every log its steps captured with `tee` there.
 
 Files written to `ci-logs`:
     log-<run id>.txt   one per failed run
@@ -15,9 +15,9 @@ Environment:
     GITHUB_REPOSITORY  owner/repo
     GITHUB_RUN_ID      run id
     GITHUB_SHA         commit being built
-    RUNNER_TEMP        directory holding compile.log
+    RUNNER_TEMP        directory holding the per-step *.log files
 
-Exit status is always 0: the failing build already failed the job, and a
+Exit status is always 0: the failing run already failed the job, and a
 diagnostics step must not mask or change that.
 """
 
@@ -35,11 +35,13 @@ BRANCH = "ci-logs"
 API = "https://api.github.com"
 ERROR_PATTERN = re.compile(
     r"error:|ERROR:|fatal error|Traceback|BUILD FAILED|Undefined symbols|"
-    r"error\]|xcodebuild: error|Failed to build|Analysis of target|no such module"
+    r"error\]|xcodebuild: error|Failed to build|Analysis of target|no such module|"
+    r"Assertion|Precondition|precondition failed|Fatal error"
 )
 MAX_INTERESTING = 80
 MAX_TAIL = 60
 MAX_TEXT = 90000
+MAX_TOTAL = 160000
 
 
 def request(method: str, url: str, token: str, payload: dict | None = None) -> tuple[int, dict]:
@@ -61,37 +63,49 @@ def request(method: str, url: str, token: str, payload: dict | None = None) -> t
         return 0, {"message": str(error)}
 
 
-def read_log() -> tuple[bool, str]:
-    temp = os.environ.get("RUNNER_TEMP") or os.environ.get("TMPDIR") or "/tmp"
-    path = Path(temp) / "compile.log"
-    if not path.is_file():
-        return False, ""
-    return True, path.read_text(encoding="utf-8", errors="replace")
+def temp_directory() -> Path:
+    return Path(os.environ.get("RUNNER_TEMP") or os.environ.get("TMPDIR") or "/tmp")
 
 
-def build_text(found: bool, text: str) -> str:
+def read_logs() -> list[tuple[str, str]]:
+    directory = temp_directory()
+    logs: list[tuple[str, str]] = []
+    for path in sorted(directory.glob("*.log")):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as error:
+            text = f"could not read {path}: {error}"
+        logs.append((path.name, text))
+    return logs
+
+
+def section(name: str, text: str) -> str:
+    lines = text.splitlines()
+    interesting = [line for line in lines if ERROR_PATTERN.search(line)]
+    parts = [f"=== {name} ({len(lines)} lines, {len(interesting)} error-like) ==="]
+    if interesting:
+        parts.append("--- error lines ---")
+        parts.extend(interesting[:MAX_INTERESTING])
+    parts.append(f"--- last {MAX_TAIL} lines ---")
+    parts.extend(lines[-MAX_TAIL:])
+    return "\n".join(parts)[:MAX_TEXT]
+
+
+def build_text(logs: list[tuple[str, str]]) -> str:
     header = [
         f"commit: {os.environ.get('GITHUB_SHA', 'unknown')}",
         f"run: {os.environ.get('GITHUB_RUN_ID', 'unknown')}",
         "",
     ]
-    if not found:
-        header.append(
-            "compile.log was not produced: the step failed before the Bazel build "
-            "started (prepare-mod-icon.py or the shell pipeline)."
-        )
+    if not logs:
+        directory = temp_directory()
+        header.append(f"no *.log files in {directory}; the failing step captured no output.")
+        header.append(f"directory listing: {sorted(p.name for p in directory.glob('*'))[:40]}")
         return "\n".join(header)
-
-    lines = text.splitlines()
-    interesting = [line for line in lines if ERROR_PATTERN.search(line)]
-    header.append(f"log lines: {len(lines)}; error-like lines: {len(interesting)}")
-    header.append("")
-    header.append("=== error lines ===")
-    header.extend(interesting[:MAX_INTERESTING])
-    header.append("")
-    header.append(f"=== last {MAX_TAIL} lines ===")
-    header.extend(lines[-MAX_TAIL:])
-    return "\n".join(header)[:MAX_TEXT]
+    header.append("logs: " + ", ".join(name for name, _ in logs))
+    body = "\n".join(header) + "\n\n"
+    body += "\n\n".join(section(name, text) for name, text in logs)
+    return body[:MAX_TOTAL]
 
 
 def ensure_branch(repository: str, token: str) -> str | None:
@@ -144,9 +158,9 @@ def main() -> int:
         print("GITHUB_TOKEN or GITHUB_REPOSITORY is missing; nothing to publish")
         return 0
 
-    found, raw = read_log()
-    text = build_text(found, raw)
-    print(text[:4000])
+    logs = read_logs()
+    text = build_text(logs)
+    print(text[:6000])
 
     if ensure_branch(repository, token) is None:
         return 0

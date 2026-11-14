@@ -58,40 +58,57 @@ jobs:
           xcodebuild -version
           df -h .
 
+      # Every check step tees into $RUNNER_TEMP, because job logs are not
+      # readable without repository admin rights and the diagnostics step can
+      # only publish files the steps themselves left behind.
       - name: Parse changed Swift sources using the real Swift compiler
-        run: python3 mod-tools/check-swift.py
+        run: |
+          set -o pipefail
+          python3 mod-tools/check-swift.py 2>&1 | tee "$RUNNER_TEMP/parse.log"
 
       - name: Validate presentation string references
-        run: python3 mod-tools/tests/test_presentation_strings.py
+        run: |
+          set -o pipefail
+          python3 mod-tools/tests/test_presentation_strings.py 2>&1 | tee "$RUNNER_TEMP/strings.log"
 
       - name: Test re-signed push notification environments
         run: |
           set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift mod-tools/tests/SGPushEnvironmentTests.swift -o "$RUNNER_TEMP/sg-push-tests"
-          "$RUNNER_TEMP/sg-push-tests"
+          {
+            xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift mod-tools/tests/SGPushEnvironmentTests.swift -o "$RUNNER_TEMP/sg-push-tests"
+            "$RUNNER_TEMP/sg-push-tests"
+          } 2>&1 | tee "$RUNNER_TEMP/push-tests.log"
 
       - name: Test storage initialization without App Groups entitlement
         run: |
           set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift mod-tools/tests/SGAppStorageTests.swift -o "$RUNNER_TEMP/sg-app-storage-tests"
-          "$RUNNER_TEMP/sg-app-storage-tests"
+          {
+            xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift mod-tools/tests/SGAppStorageTests.swift -o "$RUNNER_TEMP/sg-app-storage-tests"
+            "$RUNNER_TEMP/sg-app-storage-tests"
+          } 2>&1 | tee "$RUNNER_TEMP/app-storage-tests.log"
 
       - name: Test ghost controls and local document access
         run: |
           set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift mod-tools/tests/SGPrivacySettingsTests.swift -o "$RUNNER_TEMP/sg-privacy-tests"
-          "$RUNNER_TEMP/sg-privacy-tests"
-          xcrun swiftc -warnings-as-errors submodules/ICloudResources/Sources/ICloudFileAccess.swift mod-tools/tests/ICloudFileAccessTests.swift -o "$RUNNER_TEMP/sg-file-access-tests"
-          "$RUNNER_TEMP/sg-file-access-tests"
+          {
+            xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift mod-tools/tests/SGPrivacySettingsTests.swift -o "$RUNNER_TEMP/sg-privacy-tests"
+            "$RUNNER_TEMP/sg-privacy-tests"
+            xcrun swiftc -warnings-as-errors submodules/ICloudResources/Sources/ICloudFileAccess.swift mod-tools/tests/ICloudFileAccessTests.swift -o "$RUNNER_TEMP/sg-file-access-tests"
+            "$RUNNER_TEMP/sg-file-access-tests"
+          } 2>&1 | tee "$RUNNER_TEMP/ghost-tests.log"
 
       - name: Test streaming voice effects
         run: |
           set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift mod-tools/tests/SGVoiceChangerTests.swift -o "$RUNNER_TEMP/sg-voice-tests"
-          "$RUNNER_TEMP/sg-voice-tests"
+          {
+            xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift mod-tools/tests/SGVoiceChangerTests.swift -o "$RUNNER_TEMP/sg-voice-tests"
+            "$RUNNER_TEMP/sg-voice-tests"
+          } 2>&1 | tee "$RUNNER_TEMP/voice-tests.log"
 
       - name: Test alternate app icon packaging
-        run: python3 mod-tools/tests/test_app_icons.py
+        run: |
+          set -o pipefail
+          python3 mod-tools/tests/test_app_icons.py 2>&1 | tee "$RUNNER_TEMP/icons.log"
 
       - name: Install the Metal compiler component
         if: env.BUILD_IPA == 'true'
@@ -145,7 +162,7 @@ jobs:
         if: env.BUILD_IPA == 'true'
         run: |
           set -euo pipefail
-          python3 mod-tools/prepare-mod-icon.py
+          python3 mod-tools/prepare-mod-icon.py 2>&1 | tee "$RUNNER_TEMP/icon-prep.log"
           set +e
           python3 -u build-system/Make/Make.py \
             --bazel="$BAZEL_PATH" \
@@ -158,9 +175,10 @@ jobs:
           exit "${PIPESTATUS[0]}"
 
       # Job logs are not readable without repository admin rights, so a failed
-      # build publishes its own diagnostics as a public issue.
-      - name: Publish compile errors
-        if: failure() && env.BUILD_IPA == 'true'
+      # run publishes the step logs it captured to the `ci-logs` branch, which
+      # raw.githubusercontent.com serves without authentication.
+      - name: Publish step logs
+        if: failure()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 -u mod-tools/publish-build-log.py

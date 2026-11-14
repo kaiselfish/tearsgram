@@ -103,12 +103,12 @@ private final class SGBackgroundSilenceAudio {
                 case .began:
                     sgLocalNotificationLog("audio interrupted")
                 case .ended:
-                    guard let self.player, self.session != nil else {
+                    guard let player = self.player, self.session != nil else {
                         return
                     }
                     try? self.session?.setActive(true)
-                    if !self.player.isPlaying {
-                        _ = self.player.play()
+                    if !player.isPlaying {
+                        _ = player.play()
                     }
                     sgLocalNotificationLog("audio resumed after interruption")
                 @unknown default:
