@@ -1,0 +1,10 @@
+commit: ca1dcf8545cec25321ee3d40899c454db5c751f6
+run: 43581290095
+
+log lines: 2; error-like lines: 0
+
+=== error lines ===
+
+=== last 60 lines ===
+PostboxImportCheck: 1 problem(s):
+  submodules/TelegramUI/Sources/SGLocalNotifications.swift:6: imports Postbox, which new code must not do. Use TelegramEngine and its wrappers (EnginePeer, EngineMessage, EngineMedia, ...) instead; see CLAUDE.md, "Postbox -> TelegramEngine refactor". To allow it deliberately, add the path to submodules/Postbox/AllowedImporters.txt.
