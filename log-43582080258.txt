@@ -1,0 +1,4 @@
+commit: 8ee060d899b3d215d3fc2e9e7981ae48163c29af
+run: 43582080258
+
+compile.log was not produced: the step failed before the Bazel build started (prepare-mod-icon.py or the shell pipeline).
