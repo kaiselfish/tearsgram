@@ -1,4 +1,181 @@
-commit: 8ee060d899b3d215d3fc2e9e7981ae48163c29af
-run: 43582080258
+commit: f29b0f051ea24e952f78fece4e6db190ef7136f6
+run: 43583887000
 
-compile.log was not produced: the step failed before the Bazel build started (prepare-mod-icon.py or the shell pipeline).
+logs: app-storage-tests.log, compile.log, ghost-tests.log, icon-prep.log, icons.log, parse.log, push-tests.log, strings.log, voice-tests.log
+
+=== app-storage-tests.log (1 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: shared container, no entitlement, directory creation, restart/data preservation, explicit storage error
+
+=== compile.log (6188 lines, 8 error-like) ===
+--- error lines ---
+404 |         var error: NSError?
+506 |         var error: NSError?
+      Assertion checking: ............ no
+ERROR: /Users/runner/work/tearsgram/tearsgram/submodules/TelegramUI/BUILD:88:14: Compiling Swift module //submodules/TelegramUI:TelegramUI failed: (Exit 1): worker failed: error executing SwiftCompile command (from swift_library rule target //submodules/TelegramUI:TelegramUI) 
+submodules/TelegramUI/Sources/SGLocalNotifications.swift:260:62: error: 'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/implicit-strong-capture\ImplicitStrongCapture]8;;\]
+    |                                                              |- error: 'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/implicit-strong-capture\ImplicitStrongCapture]8;;\]
+ERROR: Build did NOT complete successfully
+Traceback (most recent call last):
+--- last 60 lines ---
+[9,691 / 9,799] Compiling Swift module //submodules/TelegramUI/Components/Wallet/WalletScreen:WalletScreen; 23s disk-cache, worker ... (3 actions, 2 running)
+[9,698 / 9,799] Compiling Swift module //submodules/TelegramUI/Components/Wallet/WalletScreen:WalletScreen; 24s disk-cache, worker ... (2 actions, 1 running)
+[9,701 / 9,799] Compiling Swift module //submodules/TelegramUI/Components/Wallet/WalletScreen:WalletScreen; 26s disk-cache, worker ... (2 actions running)
+[9,702 / 9,799] Compiling Swift module //submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen:PeerInfoScreen; 5s disk-cache, worker ... (2 actions, 1 running)
+[9,705 / 9,799] Compiling Swift module //submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen:PeerInfoScreen; 7s disk-cache, worker
+[9,705 / 9,799] Compiling Swift module //submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen:PeerInfoScreen; 17s disk-cache, worker
+[9,705 / 9,799] Compiling Swift module //submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen:PeerInfoScreen; 49s disk-cache, worker
+[9,706 / 9,799] [Prepa] Linking submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/libPeerInfoScreen.a
+[9,709 / 9,799] Compiling Swift module //submodules/TelegramUI:TelegramUI; 1s disk-cache, worker
+[9,709 / 9,799] Compiling Swift module //submodules/TelegramUI:TelegramUI; 12s disk-cache, worker
+ERROR: /Users/runner/work/tearsgram/tearsgram/submodules/TelegramUI/BUILD:88:14: Compiling Swift module //submodules/TelegramUI:TelegramUI failed: (Exit 1): worker failed: error executing SwiftCompile command (from swift_library rule target //submodules/TelegramUI:TelegramUI) 
+  (cd /Users/runner/Library/Caches/bazel/_bazel_runner/26665b6c5faaf0a762e2a635b0eafa44/execroot/_main && \
+  exec env - \
+    APPLE_SDK_PLATFORM=iPhoneOS \
+    APPLE_SDK_VERSION_OVERRIDE=27.1 \
+    PATH=/bin:/usr/bin:/usr/local/bin \
+    XCODE_VERSION_OVERRIDE=27.1.0.27A9275 \
+    ZERO_AR_DATE=1 \
+  bazel-out/darwin_arm64-opt-exec/bin/external/rules_swift+/tools/worker/worker swiftc @bazel-out/ios_arm64-opt-ios-arm64-min15.0-ST-4fc4d341170e/bin/submodules/TelegramUI/TelegramUI.swiftmodule-0.params)
+# Configuration: bc61770baaae1bdad888afe943e39c6429d0c3ccec310817c7655981adabf92c
+# Execution platform: @@platforms//host:host
+submodules/TelegramUI/Sources/SGLocalNotifications.swift:260:62: error: 'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/implicit-strong-capture\ImplicitStrongCapture]8;;\]
+250 | 
+251 |     func activate(sharedContext: SharedAccountContextImpl, wakeupManager: SharedWakeupManager) {
+252 |         Queue.mainQueue().async {
+    |                                 |- note: 'self' implicitly strongly captured here
+    |                                 `- note: add 'self' as a capture list item to silence
+253 |             guard self.accountsDisposable == nil else {
+254 |                 return
+    :
+258 |             self.requestAuthorizationIfNeeded()
+259 |             self.accountsDisposable = (sharedContext.activeAccountContexts
+260 |             |> deliverOnMainQueue).startStrict(next: { [weak self] accounts in
+    |                                                              |- error: 'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/implicit-strong-capture\ImplicitStrongCapture]8;;\]
+    |                                                              `- note: explicitly assign the capture list item to silence
+261 |                 self?.updateWatchedAccounts(accounts.accounts.map { $0.1 })
+262 |             })
+
+[#ImplicitStrongCapture]: <https://docs.swift.org/compiler/documentation/diagnostics/implicit-strong-capture>
+[9,710 / 9,799] checking cached actions
+Target //Telegram:Swiftgram failed to build
+INFO: Elapsed time: 2126.705s, Critical Path: 1628.12s
+INFO: 9710 processes: 7259 disk cache hit, 1745 internal, 23 local, 683 worker.
+ERROR: Build did NOT complete successfully
+Traceback (most recent call last):
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/Make.py", line 1431, in <module>
+    build(bazel=bazel_path, arguments=args)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/Make.py", line 677, in build
+    bazel_command_line.invoke_build()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/Make.py", line 340, in invoke_build
+    call_executable(combined_arguments)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/BuildEnvironment.py", line 104, in call_executable
+    subprocess.check_call(resolved_arguments, env=resolved_env)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 534, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command ['/Users/runner/work/_temp/bazel-9.2.0-darwin-arm64', 'build', 'Telegram/Swiftgram', '--announce_rc', '--features=swift.use_global_module_cache', '--verbose_failures', '--remote_cache_async', '--define=buildNumber=13', '--disk_cache=/Users/runner/work/_temp/tearsgram-bazel-cache', '-c', 'opt', '--ios_multi_cpus=arm64', '--watchos_cpus=arm64_32', '--apple_generate_dsym', '--output_groups=+dsyms', '--@rules_rust//rust/settings:lto=fat', '--features=swift.opt_uses_wmo', '--features=swift.opt_uses_osize', '--features=dead_strip', '--objc_enable_binary_stripping'] returned non-zero exit status 1.
+
+=== ghost-tests.log (2 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: unlimited archive persistence and eviction policy; independent ghost controls, migration, story views, call exclusion, FPS/background preferences; local notification defaults
+PASS: local APK/IPA without scope, filename preservation, grant ownership during upload and balanced release
+
+=== icon-prep.log (3 lines, 0 error-like) ===
+--- last 60 lines ---
+/Users/runner/work/tearsgram/tearsgram/branding/AppIcon-1024.png
+  /Users/runner/work/tearsgram/tearsgram/Telegram/Telegram-iOS/Swiftgram.icon/Assets/ModIcon.png
+Primary icon written from AppIcon-1024.png to Telegram/Telegram-iOS/Swiftgram.icon/Assets/ModIcon.png
+
+=== icons.log (6 lines, 0 error-like) ===
+--- last 60 lines ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.017s
+
+OK
+Prepared tearsgram: com.tearsgram.app. The IPA requires a new signature.
+
+=== parse.log (71 lines, 0 error-like) ===
+--- last 60 lines ---
+Parsed: submodules/TelegramUI/Sources/SharedAccountContext.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift
+Parsed: submodules/TelegramUI/Sources/ManagedAudioRecorder.swift
+Parsed: mod-tools/tests/SGVoiceChangerTests.swift
+Parsed: submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGModIconsController.swift
+Parsed: Swiftgram/SGProUI/Sources/SGProUI.swift
+Parsed: Swiftgram/SGProUI/Sources/AppBadgeSelectorController.swift
+Parsed: submodules/TelegramUI/Sources/OpenUrl.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatMessageItemView/Sources/ChatMessageItemView.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatTextInputPanelNode/Sources/ChatTextInputPanelNode.swift
+Parsed: submodules/TelegramUI/Components/MessageInputPanelComponent/Sources/MessageInputPanelComponent.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraUtils.swift
+Parsed: submodules/TelegramCore/Sources/State/PendingMessageManager.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
+Parsed: submodules/TelegramUI/Components/Resources/FetchVideoMediaResource/Sources/FetchVideoMediaResource.swift
+Parsed: submodules/Display/Source/WindowContent.swift
+Parsed: submodules/Camera/Sources/Camera.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraDevice.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraOutput.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/LegacyCamera.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/LegacyCameraImpl.swift
+Parsed: submodules/TelegramUI/Components/VideoMessageCameraScreen/Sources/VideoMessageCameraScreen.swift
+Parsed: Swiftgram/SGTelegramUIExtensions/Sources/SGTelegramUIExtensions.swift
+Parsed: submodules/ICloudResources/Sources/ICloudFileAccess.swift
+Parsed: submodules/ICloudResources/Sources/ICloudResources.swift
+Parsed: submodules/TelegramUI/Sources/ChatControllerOpenAttachmentMenu.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
+Parsed: mod-tools/tests/SGPrivacySettingsTests.swift
+Parsed: mod-tools/tests/ICloudFileAccessTests.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift
+Parsed: submodules/TelegramUI/Sources/AppDelegate.swift
+Parsed: submodules/TelegramUI/Sources/SGLocalNotifications.swift
+Parsed: mod-tools/tests/SGAppStorageTests.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift
+Parsed: submodules/TelegramCore/Sources/Account/AccountManager.swift
+Parsed: submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
+Parsed: submodules/TelegramPresentationData/Sources/Resources/PresentationResourcesSettings.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
+Parsed: Swiftgram/SGItemListUI/Sources/SGItemListUI.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGDeletedMessagesController.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGSettingsController.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift
+Parsed: submodules/TelegramCore/Sources/Settings/SGDeletedMessages.swift
+Parsed: submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
+Parsed: submodules/TelegramCore/Sources/State/AccountViewTracker.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedConsumePersonalMessagesActions.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeMarkAllUnseenPersonalMessagesOperations.swift
+Parsed: submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkAllChatsAsRead.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift
+All 70 Swift files parsed. Type checking and an IPA build are separate steps.
+
+=== push-tests.log (1 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: development, production, missing capability, unknown environment, malformed and oversized profiles
+
+=== strings.log (5 lines, 0 error-like) ===
+--- last 60 lines ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.010s
+
+OK
+
+=== voice-tests.log (3 lines, 0 error-like) ===
+--- last 60 lines ---
+Female voice peak at 16000 Hz sample rate: 270 Hz (input 220 Hz)
+Female voice peak at 48000 Hz sample rate: 270 Hz (input 220 Hz)
+Voice effect persistence, bypass, pitch, silence and streaming continuity passed
