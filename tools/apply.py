@@ -341,6 +341,40 @@ LOCAL_NOTIFICATIONS_SETTINGS_NEW = """    public static var videoNotes60FPS: Boo
     }
 }"""
 
+QUIET_HOURS_SETTINGS_OLD = """    /// Keeps the process running in the background with looping silent audio so
+    /// the update loop stays connected and new messages reach the postbox.
+    public static var backgroundKeepAlive: Bool {
+        get { preference("sg.mod.backgroundKeepAlive", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.backgroundKeepAlive") }
+    }
+}"""
+
+QUIET_HOURS_SETTINGS_NEW = """    /// Keeps the process running in the background with looping silent audio so
+    /// the update loop stays connected and new messages reach the postbox.
+    public static var backgroundKeepAlive: Bool {
+        get { preference("sg.mod.backgroundKeepAlive", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.backgroundKeepAlive") }
+    }
+
+    /// Banner suppression window, `"off"` or `"23-8"` in local time. While the
+    /// window is open no banner is posted; when it closes one summary arrives.
+    public static var quietHours: String {
+        get { UserDefaults.standard.string(forKey: "sg.mod.quietHours") ?? "off" }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "sg.mod.quietHours")
+            NotificationCenter.default.post(name: changed, object: nil)
+        }
+    }
+
+    public static func quietHoursLabel(russian: Bool) -> String {
+        let parts = quietHours.split(separator: "-")
+        guard parts.count == 2, let start = Int(parts[0]), let end = Int(parts[1]) else {
+            return russian ? "Выкл" : "Off"
+        }
+        return String(format: "%02d:00 – %02d:00", start, end)
+    }
+}"""
+
 BG_TASK_OLD = """	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>
@@ -357,11 +391,18 @@ BG_TASK_NEW = """	<key>BGTaskSchedulerPermittedIdentifiers</key>
 def patch_local_notification_settings(repo: Path) -> bool:
     path = repo / "Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift"
     text = read(path)
-    if "sg.mod.localNotifications" in text:
-        return False
-    require(LOCAL_NOTIFICATIONS_SETTINGS_OLD in text, f"{path}: videoNotes60FPS block not found")
-    write(path, text.replace(LOCAL_NOTIFICATIONS_SETTINGS_OLD, LOCAL_NOTIFICATIONS_SETTINGS_NEW, 1))
-    return True
+    changed = False
+    if "sg.mod.localNotifications" not in text:
+        require(LOCAL_NOTIFICATIONS_SETTINGS_OLD in text, f"{path}: videoNotes60FPS block not found")
+        text = text.replace(LOCAL_NOTIFICATIONS_SETTINGS_OLD, LOCAL_NOTIFICATIONS_SETTINGS_NEW, 1)
+        changed = True
+    if "sg.mod.quietHours" not in text:
+        require(QUIET_HOURS_SETTINGS_OLD in text, f"{path}: backgroundKeepAlive block not found")
+        text = text.replace(QUIET_HOURS_SETTINGS_OLD, QUIET_HOURS_SETTINGS_NEW, 1)
+        changed = True
+    if changed:
+        write(path, text)
+    return changed
 
 
 def patch_notification_settings(repo: Path) -> bool:
@@ -421,6 +462,121 @@ def patch_notification_settings(repo: Path) -> bool:
         + anchor
     )
     text = replace_once(text, anchor, addition, path, "notification rows", marker="section: .notifications, settingName: .localNotifications")
+
+    if text != original:
+        write(path, text)
+        return True
+    return False
+
+
+QUIET_HOURS_SHEET_OLD = """    }, setOneFromManyValue: { setting in
+        guard setting == "voiceEffect" else { return }"""
+
+QUIET_HOURS_SHEET_NEW = """    }, setOneFromManyValue: { setting in
+        if setting == "quietHours" {
+            let data = context.sharedContext.currentPresentationData.with { $0 }
+            let ru = data.strings.baseLanguageCode.hasPrefix("ru")
+            let sheet = ActionSheetController(presentationData: data)
+            let options: [(value: String, title: String)] = [
+                (value: "off", title: ru ? "Выкл" : "Off"),
+                (value: "23-8", title: "23:00 – 08:00"),
+                (value: "22-7", title: "22:00 – 07:00"),
+                (value: "0-7", title: "00:00 – 07:00"),
+                (value: "1-9", title: "01:00 – 09:00")
+            ]
+            var items: [ActionSheetItem] = options.map { option in
+                ActionSheetButtonItem(title: option.title, color: .accent, action: { [weak sheet] in
+                    sheet?.dismissAnimated()
+                    SGPrivacySettings.quietHours = option.value
+                    changed.set(true)
+                })
+            }
+            items.append(ActionSheetButtonItem(title: data.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak sheet] in
+                sheet?.dismissAnimated()
+            }))
+            sheet.setItemGroups([ActionSheetItemGroup(items: items)])
+            presentImpl?(sheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+            return
+        }
+        guard setting == "voiceEffect" else { return }"""
+
+TEST_NOTIFICATION_OLD = """    }, action: { action in
+        if action == "saveArchiveLimit","""
+
+TEST_NOTIFICATION_NEW = """    }, action: { action in
+        if action == "testNotification" {
+            let data = context.sharedContext.currentPresentationData.with { $0 }
+            let ru = data.strings.baseLanguageCode.hasPrefix("ru")
+            let now = Date()
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            let content = UNMutableNotificationContent()
+            content.title = "tearsgram"
+            content.body = (ru ? "Проверка уведомлений в " : "Notification test at ") + formatter.string(from: now)
+            content.sound = .default
+            let identifier = "sg.test.\\(Int(now.timeIntervalSince1970))"
+            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5.0, repeats: false))
+            UNUserNotificationCenter.current().add(request, withCompletionHandler: { _ in
+            })
+            return
+        }
+        if action == "saveArchiveLimit","""
+
+QUIET_HOURS_ROWS_ANCHOR = "        entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60,"
+
+QUIET_HOURS_ROWS = (
+    '        entries.append(.oneFromManySelector(id: counter.count, section: .notifications, settingName: "quietHours", '
+    'text: ru ? "Тихие часы" : "Quiet hours", value: SGPrivacySettings.quietHoursLabel(russian: ru), '
+    "enabled: SGPrivacySettings.localNotifications))\n"
+    '        entries.append(.action(id: counter.count, section: .notifications, actionType: "testNotification", '
+    'text: ru ? "Проверить уведомление" : "Send a test notification", kind: .generic))\n'
+    "        entries.append(.notice(id: counter.count, section: .notifications, text: ru ? "
+    '"Тихие часы: пока окно открыто, баннеры не показываются, но сообщения считаются. Когда окно закрывается, '
+    "приходит одна сводка: сколько сообщений пришло и в скольких чатах. Если открыть приложение раньше, сводка "
+    "не появится. «Проверить уведомление» пришлёт тестовый баннер через 5 секунд: нажми кнопку и сверни приложение.\" "
+    ': "Quiet hours: while the window is open no banners are posted, but messages are counted. When the window closes '
+    "one summary arrives with the number of messages and chats. Opening the app first drops the summary. Send a test "
+    'notification posts a banner in 5 seconds: tap the button, then send the app to the background."))\n'
+)
+
+
+def patch_quiet_hours_ui(repo: Path) -> bool:
+    path = repo / "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift"
+    text = read(path)
+    original = text
+
+    text = replace_once(
+        text,
+        "import SGProUI\n",
+        "import SGProUI\nimport UserNotifications\n",
+        path,
+        "UserNotifications import",
+        marker="import UserNotifications",
+    )
+    text = replace_once(
+        text,
+        QUIET_HOURS_SHEET_OLD,
+        QUIET_HOURS_SHEET_NEW,
+        path,
+        "quiet hours selector",
+        marker='if setting == "quietHours"',
+    )
+    text = replace_once(
+        text,
+        TEST_NOTIFICATION_OLD,
+        TEST_NOTIFICATION_NEW,
+        path,
+        "test notification action",
+        marker='if action == "testNotification"',
+    )
+    text = replace_once(
+        text,
+        QUIET_HOURS_ROWS_ANCHOR,
+        QUIET_HOURS_ROWS + QUIET_HOURS_ROWS_ANCHOR,
+        path,
+        "quiet hours rows",
+        marker='settingName: "quietHours"',
+    )
 
     if text != original:
         write(path, text)
@@ -608,6 +764,9 @@ def verify(repo: Path) -> list[str]:
             ("case .appBadge:", 1),
             ("link: .appBadge", 1),
             ("section: .notifications, settingName: .localNotifications", 1),
+            ('settingName: "quietHours"', 1),
+            ('actionType: "testNotification"', 1),
+            ("import UserNotifications", 1),
         ):
             actual = text.count(token)
             if actual != expected:
@@ -641,7 +800,7 @@ def verify(repo: Path) -> list[str]:
         problems.append("SGLocalNotifications.swift is missing from submodules/TelegramUI/Sources")
     else:
         text = read(local_notifications)
-        for token in ("SGBackgroundSilenceAudio", "SGAccountNotificationWatcher", "setBadgeCount", "threadIdentifier"):
+        for token in ("SGBackgroundSilenceAudio", "SGAccountNotificationWatcher", "setBadgeCount", "threadIdentifier", "quietHoursRange", "flushQuietDigest"):
             if token not in text:
                 problems.append(f"SGLocalNotifications.swift: {token} is missing")
 
@@ -652,6 +811,7 @@ def verify(repo: Path) -> list[str]:
         for key, declaration in (
             ("sg.mod.localNotifications", "public static var localNotifications: Bool"),
             ("sg.mod.backgroundKeepAlive", "public static var backgroundKeepAlive: Bool"),
+            ("sg.mod.quietHours", "public static var quietHours: String"),
         ):
             if text.count(key) != 2:
                 problems.append(f"SGPrivacySettings.swift: {key!r} appears {text.count(key)} times, expected 2")
@@ -659,6 +819,8 @@ def verify(repo: Path) -> list[str]:
                 problems.append(
                     f"SGPrivacySettings.swift: {declaration!r} appears {text.count(declaration)} times, expected 1"
                 )
+        if text.count("func quietHoursLabel") != 1:
+            problems.append("SGPrivacySettings.swift: quietHoursLabel is missing")
 
     app_delegate = repo / "submodules/TelegramUI/Sources/AppDelegate.swift"
     if app_delegate.is_file():
@@ -751,6 +913,7 @@ def main() -> int:
         routes_changed = patch_url_routes(repo)
         notification_settings_changed = patch_local_notification_settings(repo)
         notification_ui_changed = patch_notification_settings(repo)
+        quiet_hours_changed = patch_quiet_hours_ui(repo)
         local_notifications_changed = patch_local_notifications(repo)
         background_tasks_changed = patch_background_tasks(repo)
         renamed = brand_rename(repo)
@@ -768,6 +931,7 @@ def main() -> int:
     print("SGTelegramUIExtensions.swift patched:", routes_changed)
     print("SGPrivacySettings.swift patched:", notification_settings_changed)
     print("notification settings rows patched:", notification_ui_changed)
+    print("quiet hours rows patched:", quiet_hours_changed)
     print("AppDelegate.swift local notifications patched:", local_notifications_changed)
     print("background task identifiers patched:", background_tasks_changed)
     print("files rebranded:", len(renamed))

@@ -163,4 +163,22 @@ public enum SGPrivacySettings {
         get { preference("sg.mod.backgroundKeepAlive", defaultValue: true) }
         set { set(newValue, for: "sg.mod.backgroundKeepAlive") }
     }
+
+    /// Banner suppression window, `"off"` or `"23-8"` in local time. While the
+    /// window is open no banner is posted; when it closes one summary arrives.
+    public static var quietHours: String {
+        get { UserDefaults.standard.string(forKey: "sg.mod.quietHours") ?? "off" }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "sg.mod.quietHours")
+            NotificationCenter.default.post(name: changed, object: nil)
+        }
+    }
+
+    public static func quietHoursLabel(russian: Bool) -> String {
+        let parts = quietHours.split(separator: "-")
+        guard parts.count == 2, let start = Int(parts[0]), let end = Int(parts[1]) else {
+            return russian ? "Выкл" : "Off"
+        }
+        return String(format: "%02d:00 – %02d:00", start, end)
+    }
 }

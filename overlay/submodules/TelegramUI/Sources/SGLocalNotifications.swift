@@ -34,6 +34,8 @@ private func sgLocalNotificationLog(_ text: String) {
 
 private let sgLastDeliveredIdsPrefix = "sg.localNotifications.lastIds."
 private let sgMaximumMessageAge: Int32 = 300
+private let sgQuietDigestCountPrefix = "sg.localNotifications.quietCount."
+private let sgQuietDigestChatsPrefix = "sg.localNotifications.quietChats."
 
 // MARK: - Silent audio that keeps the process alive in the background
 
@@ -273,10 +275,102 @@ final class SGLocalNotificationManager {
         }
         self.isInForeground = foreground
         if foreground {
+            // The user is looking at the chat list: a "while it was quiet"
+            // summary would only repeat what the badges already show.
+            for context in self.activeAccountContexts {
+                _ = self.takeQuietDigest(accountId: context.account.id)
+            }
             self.stopKeepAlive()
         } else {
             self.startKeepAliveIfNeeded()
         }
+    }
+
+    // MARK: quiet hours
+
+    /// `"off"` or `"23-8"`: the window in which banners stay silent.
+    private func quietHoursRange() -> (start: Int, end: Int)? {
+        let parts = SGPrivacySettings.quietHours.split(separator: "-")
+        guard parts.count == 2,
+            let start = Int(parts[0]),
+            let end = Int(parts[1]),
+            (0 ... 23).contains(start),
+            (0 ... 23).contains(end),
+            start != end
+        else {
+            return nil
+        }
+        return (start, end)
+    }
+
+    private func isQuietNow(_ range: (start: Int, end: Int)) -> Bool {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if range.start < range.end {
+            return hour >= range.start && hour < range.end
+        }
+        // The window crosses midnight, for example 23-8.
+        return hour >= range.start || hour < range.end
+    }
+
+    private func recordQuietSuppressed(accountId: AccountRecordId, peerId: PeerId) {
+        let defaults = UserDefaults.standard
+        let countKey = sgQuietDigestCountPrefix + "\(accountId.int64)"
+        let chatsKey = sgQuietDigestChatsPrefix + "\(accountId.int64)"
+        defaults.set(defaults.integer(forKey: countKey) + 1, forKey: countKey)
+        var chats = Set<Int64>()
+        if let stored = defaults.array(forKey: chatsKey) as? [NSNumber] {
+            for value in stored {
+                chats.insert(value.int64Value)
+            }
+        }
+        chats.insert(peerId.toInt64())
+        defaults.set(chats.map { NSNumber(value: $0) }, forKey: chatsKey)
+    }
+
+    private func takeQuietDigest(accountId: AccountRecordId) -> (count: Int, chats: Int) {
+        let defaults = UserDefaults.standard
+        let countKey = sgQuietDigestCountPrefix + "\(accountId.int64)"
+        let chatsKey = sgQuietDigestChatsPrefix + "\(accountId.int64)"
+        let count = defaults.integer(forKey: countKey)
+        let chats = (defaults.array(forKey: chatsKey) as? [NSNumber])?.count ?? 0
+        defaults.removeObject(forKey: countKey)
+        defaults.removeObject(forKey: chatsKey)
+        return (count, chats)
+    }
+
+    /// Posted once when the quiet window closes: the chats stayed silent all
+    /// night, so their unread count would otherwise only surface as a badge.
+    private func flushQuietDigest(accountId: AccountRecordId, presentationData: PresentationData) {
+        let digest = self.takeQuietDigest(accountId: accountId)
+        guard digest.count > 0, !self.isInForeground else {
+            return
+        }
+        let ru = presentationData.strings.baseLanguageCode.hasPrefix("ru")
+        let body: String
+        if digest.chats > 1 {
+            body = ru
+                ? "Пока было тихо: \(digest.count) сообщений в \(digest.chats) чатах"
+                : "While it was quiet: \(digest.count) messages in \(digest.chats) chats"
+        } else {
+            body = ru
+                ? "Пока было тихо: \(digest.count) сообщений"
+                : "While it was quiet: \(digest.count) messages"
+        }
+        let content = UNMutableNotificationContent()
+        content.title = "tearsgram"
+        content.body = body
+        content.sound = .default
+        content.threadIdentifier = "sg.quiet.\(accountId.int64)"
+        var userInfo: [AnyHashable: Any] = [:]
+        userInfo["accountId"] = accountId.int64
+        content.userInfo = userInfo
+        let identifier = "sg.quiet.digest.\(accountId.int64)"
+        // One summary per account instead of a stack of them.
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier])
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: { _ in
+        })
+        sgLocalNotificationLog("quiet hours summary: \(digest.count) message(s) in \(digest.chats) chat(s)")
     }
 
     /// Used by the background refresh task: deliver for every signed-in account,
@@ -367,6 +461,13 @@ final class SGLocalNotificationManager {
     private func process(view: ChatListView, accountContext: AccountContext, presentationData: PresentationData) {
         let account = accountContext.account
         let storeKey = sgLastDeliveredIdsPrefix + "\(account.id.int64)"
+        // Quiet hours: collect a digest instead of banners while the window is
+        // open, and release it as one summary as soon as the window closes.
+        let quietRange = self.quietHoursRange()
+        let isQuiet = quietRange.map { self.isQuietNow($0) } ?? false
+        if !isQuiet {
+            self.flushQuietDigest(accountId: account.id, presentationData: presentationData)
+        }
         let rawStored = UserDefaults.standard.dictionary(forKey: storeKey) ?? [:]
         var stored: [String: Int] = [:]
         for (key, value) in rawStored {
@@ -413,6 +514,10 @@ final class SGLocalNotificationManager {
                 continue
             }
             guard topMessage.flags.contains(.Incoming) else {
+                continue
+            }
+            if isQuiet {
+                self.recordQuietSuppressed(accountId: account.id, peerId: peer.id)
                 continue
             }
             self.post(notificationFor: topMessage, peer: peer, accountContext: accountContext, presentationData: presentationData, totalUnread: totalUnread)

@@ -8,6 +8,7 @@ import AccountContext
 import SGItemListUI
 import SGSimpleSettings
 import SGProUI
+import UserNotifications
 
 private enum SGModSection: Int32, SGItemListSection {
     case appearance
@@ -82,6 +83,31 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         }
         changed.set(true)
     }, setOneFromManyValue: { setting in
+        if setting == "quietHours" {
+            let data = context.sharedContext.currentPresentationData.with { $0 }
+            let ru = data.strings.baseLanguageCode.hasPrefix("ru")
+            let sheet = ActionSheetController(presentationData: data)
+            let options: [(value: String, title: String)] = [
+                (value: "off", title: ru ? "Выкл" : "Off"),
+                (value: "23-8", title: "23:00 – 08:00"),
+                (value: "22-7", title: "22:00 – 07:00"),
+                (value: "0-7", title: "00:00 – 07:00"),
+                (value: "1-9", title: "01:00 – 09:00")
+            ]
+            var items: [ActionSheetItem] = options.map { option in
+                ActionSheetButtonItem(title: option.title, color: .accent, action: { [weak sheet] in
+                    sheet?.dismissAnimated()
+                    SGPrivacySettings.quietHours = option.value
+                    changed.set(true)
+                })
+            }
+            items.append(ActionSheetButtonItem(title: data.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak sheet] in
+                sheet?.dismissAnimated()
+            }))
+            sheet.setItemGroups([ActionSheetItemGroup(items: items)])
+            presentImpl?(sheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+            return
+        }
         guard setting == "voiceEffect" else { return }
         let data = context.sharedContext.currentPresentationData.with { $0 }
         let ru = data.strings.baseLanguageCode.hasPrefix("ru")
@@ -114,6 +140,22 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             }
         }
     }, action: { action in
+        if action == "testNotification" {
+            let data = context.sharedContext.currentPresentationData.with { $0 }
+            let ru = data.strings.baseLanguageCode.hasPrefix("ru")
+            let now = Date()
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            let content = UNMutableNotificationContent()
+            content.title = "tearsgram"
+            content.body = (ru ? "Проверка уведомлений в " : "Notification test at ") + formatter.string(from: now)
+            content.sound = .default
+            let identifier = "sg.test.\(Int(now.timeIntervalSince1970))"
+            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5.0, repeats: false))
+            UNUserNotificationCenter.current().add(request, withCompletionHandler: { _ in
+            })
+            return
+        }
         if action == "saveArchiveLimit", let limit = Int(archiveLimitInput), (1 ... 10000).contains(limit) {
             SGPrivacySettings.deletedMessagesLimit = limit
             archiveLimitInput = String(limit)
@@ -168,6 +210,9 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         entries.append(.toggle(id: counter.count, section: .notifications, settingName: .localNotifications, value: SGPrivacySettings.localNotifications, text: ru ? "Локальные уведомления" : "Local notifications", enabled: true))
         entries.append(.toggle(id: counter.count, section: .notifications, settingName: .backgroundKeepAlive, value: SGPrivacySettings.backgroundKeepAlive, text: ru ? "Не засыпать в фоне" : "Stay awake in background", enabled: SGPrivacySettings.localNotifications))
         entries.append(.notice(id: counter.count, section: .notifications, text: ru ? "Пуш-уведомления от серверов Telegram в этой сборке недоступны: переподписанная подпись не даёт доступ к APNs, а bundle id com.tearsgram.app не совпадает с темой пушей Telegram. Поэтому уведомления показывает сам клиент, пока остаётся запущенным. С включённым «Не засыпать в фоне» он держит соединение и тихо играет беззвучную дорожку (расход батареи выше). После принудительного закрытия из свайпа уведомления не приходят до следующего запуска." : "Push from Telegram servers cannot work in this build: a re-signed profile has no APNs access, and com.tearsgram.app does not match the push topic of Telegram. The client therefore posts its own notifications while it stays running. With Stay awake in background enabled it keeps the connection and plays a silent track (higher battery use). After a swipe-up force quit no notifications arrive until the next launch."))
+        entries.append(.oneFromManySelector(id: counter.count, section: .notifications, settingName: "quietHours", text: ru ? "Тихие часы" : "Quiet hours", value: SGPrivacySettings.quietHoursLabel(russian: ru), enabled: SGPrivacySettings.localNotifications))
+        entries.append(.action(id: counter.count, section: .notifications, actionType: "testNotification", text: ru ? "Проверить уведомление" : "Send a test notification", kind: .generic))
+        entries.append(.notice(id: counter.count, section: .notifications, text: ru ? "Тихие часы: пока окно открыто, баннеры не показываются, но сообщения считаются. Когда окно закрывается, приходит одна сводка: сколько сообщений пришло и в скольких чатах. Если открыть приложение раньше, сводка не появится. «Проверить уведомление» пришлёт тестовый баннер через 5 секунд: нажми кнопку и сверни приложение." : "Quiet hours: while the window is open no banners are posted, but messages are counted. When the window closes one summary arrives with the number of messages and chats. Opening the app first drops the summary. Send a test notification posts a banner in 5 seconds: tap the button, then send the app to the background."))
         entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60, value: SGPrivacySettings.videoNotes60FPS, text: ru ? "Кружки: 60 FPS" : "Video messages: 60 FPS", enabled: true))
         entries.append(.notice(id: counter.count, section: .camera, text: ru ? "Выключено — стандартные 30 FPS. В режиме 60 FPS используется одна камера: фронтальная или задняя, с переключением при записи. Камера должна поддерживать формат 60 FPS. Изменение применяется при следующем открытии записи кружка." : "Off uses the default 30 FPS. 60 FPS uses one camera at a time, front or back, with switching while recording. A supported 60 FPS camera format is required. Changes apply the next time video-message recording opens."))
         entries.append(.header(id: counter.count, section: .voice, text: ru ? "Голосовые сообщения" : "Voice messages", badge: nil))
