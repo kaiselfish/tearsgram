@@ -1,0 +1,90 @@
+commit: 47f8c5f6765bd4cb855014cdbd73ce8a71ed32cf
+run: 43598590198
+
+logs: app-storage-tests.log, ghost-tests.log, parse.log, push-tests.log, strings.log
+
+=== app-storage-tests.log (1 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: shared container, no entitlement, directory creation, restart/data preservation, explicit storage error
+
+=== ghost-tests.log (2 lines, 1 error-like) ===
+--- error lines ---
+main/SGPrivacySettingsTests.swift:105: Precondition failed
+--- last 60 lines ---
+main/SGPrivacySettingsTests.swift:105: Precondition failed
+/Users/runner/work/_temp/eca6c328-8899-4547-9b5a-e22ecd451cad.sh: line 7:  1888 Trace/BPT trap: 5       "$RUNNER_TEMP/sg-privacy-tests"
+
+=== parse.log (71 lines, 0 error-like) ===
+--- last 60 lines ---
+Parsed: submodules/TelegramUI/Sources/SharedAccountContext.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift
+Parsed: submodules/TelegramUI/Sources/ManagedAudioRecorder.swift
+Parsed: mod-tools/tests/SGVoiceChangerTests.swift
+Parsed: submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGModIconsController.swift
+Parsed: Swiftgram/SGProUI/Sources/SGProUI.swift
+Parsed: Swiftgram/SGProUI/Sources/AppBadgeSelectorController.swift
+Parsed: submodules/TelegramUI/Sources/OpenUrl.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatMessageItemView/Sources/ChatMessageItemView.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatTextInputPanelNode/Sources/ChatTextInputPanelNode.swift
+Parsed: submodules/TelegramUI/Components/MessageInputPanelComponent/Sources/MessageInputPanelComponent.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraUtils.swift
+Parsed: submodules/TelegramCore/Sources/State/PendingMessageManager.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
+Parsed: submodules/TelegramUI/Components/Resources/FetchVideoMediaResource/Sources/FetchVideoMediaResource.swift
+Parsed: submodules/Display/Source/WindowContent.swift
+Parsed: submodules/Camera/Sources/Camera.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraDevice.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraOutput.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/LegacyCamera.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/LegacyCameraImpl.swift
+Parsed: submodules/TelegramUI/Components/VideoMessageCameraScreen/Sources/VideoMessageCameraScreen.swift
+Parsed: Swiftgram/SGTelegramUIExtensions/Sources/SGTelegramUIExtensions.swift
+Parsed: submodules/ICloudResources/Sources/ICloudFileAccess.swift
+Parsed: submodules/ICloudResources/Sources/ICloudResources.swift
+Parsed: submodules/TelegramUI/Sources/ChatControllerOpenAttachmentMenu.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
+Parsed: mod-tools/tests/SGPrivacySettingsTests.swift
+Parsed: mod-tools/tests/ICloudFileAccessTests.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift
+Parsed: submodules/TelegramUI/Sources/AppDelegate.swift
+Parsed: submodules/TelegramUI/Sources/SGLocalNotifications.swift
+Parsed: mod-tools/tests/SGAppStorageTests.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift
+Parsed: submodules/TelegramCore/Sources/Account/AccountManager.swift
+Parsed: submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
+Parsed: submodules/TelegramPresentationData/Sources/Resources/PresentationResourcesSettings.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
+Parsed: Swiftgram/SGItemListUI/Sources/SGItemListUI.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGDeletedMessagesController.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGSettingsController.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift
+Parsed: submodules/TelegramCore/Sources/Settings/SGDeletedMessages.swift
+Parsed: submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
+Parsed: submodules/TelegramCore/Sources/State/AccountViewTracker.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedConsumePersonalMessagesActions.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeMarkAllUnseenPersonalMessagesOperations.swift
+Parsed: submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkAllChatsAsRead.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift
+All 70 Swift files parsed. Type checking and an IPA build are separate steps.
+
+=== push-tests.log (1 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: development, production, missing capability, unknown environment, malformed and oversized profiles
+
+=== strings.log (5 lines, 0 error-like) ===
+--- last 60 lines ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.011s
+
+OK
