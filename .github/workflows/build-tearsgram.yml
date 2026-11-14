@@ -146,6 +146,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 mod-tools/prepare-mod-icon.py
+          set +e
           python3 -u build-system/Make/Make.py \
             --bazel="$BAZEL_PATH" \
             --cacheDir="$RUNNER_TEMP/tearsgram-bazel-cache" \
@@ -153,7 +154,26 @@ jobs:
             --configurationPath=build-input/mod-ci-configuration.json \
             --codesigningInformationPath=build-system/fake-codesigning \
             --buildNumber="$GITHUB_RUN_NUMBER" \
-            --configuration=release_arm64
+            --configuration=release_arm64 2>&1 | tee "$RUNNER_TEMP/compile.log"
+          exit "${PIPESTATUS[0]}"
+
+      # Job logs need admin rights, so surface the failure as annotations that
+      # anyone can read on the run page.
+      - name: Report compile errors as annotations
+        if: failure() && env.BUILD_IPA == 'true'
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/compile.log"
+          if [ ! -s "$log" ]; then
+            echo "::error::compile.log was not produced; the failure happened before the build started"
+            exit 0
+          fi
+          grep -E "(error:|ERROR:|fatal error|Traceback|BUILD FAILED)" "$log" | head -n 20 | while IFS= read -r line; do
+            clean="${line:0:900}"
+            echo "::error::${clean}"
+          done
+          echo "::error::last log lines: $(tail -n 12 "$log" | tr '\n' '|' | cut -c1-1500)"
+          exit 0
 
       - name: Prepare artifact for signing on Windows
         if: env.BUILD_IPA == 'true'
