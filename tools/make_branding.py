@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Generate tearsgram bitmap assets from branding/logo.png.
+"""Generate the tearsgram bitmap assets from the files in branding/.
 
-Outputs
--------
-branding/AppIcon-1024.png                                  main app icon (@1x master)
-mod-tools/app-icons/NGCustom{1,2,3}-*.png                  alternate icons for brand-ipa.py
-Swiftgram/SGAppBadgeAssets/.../TearsgramAppBadge.imageset  badge under the Dynamic Island
-Swiftgram/SGAppBadgeAssets/.../TearsgramTwilightBadge.imageset
-Swiftgram/SGAppBadgeAssets/.../TearsgramTrollfaceBadge.imageset
+Inputs / outputs
+----------------
+branding/shit.png      -> branding/AppIcon-1024.png   primary Home Screen icon
+branding/logo.png      -> mod-tools/app-icons/NGCustom1-*   "Icon 1"
+branding/hubert.png    -> mod-tools/app-icons/NGCustom2-*   "Icon 2"
+branding/shit.png      -> mod-tools/app-icons/NGCustom0-60@3x.png  picker preview
+branding/twilight.png  -> .../TearsgramTwilightBadge.imageset
+branding/trollface.png -> .../TearsgramTrollfaceBadge.imageset
+
+There is no third alternate icon any more: NGCustom3-* is deleted on every run.
 
 The badges are drawn at 279 x 66 px (93 x 22 pt @3x) so they match the stock
-Swiftgram badge geometry and never overlap the compact Dynamic Island.
+Swiftgram badge geometry and never overlap the compact Dynamic Island. They
+have no rim, no border and no lettering unless a wordmark is requested.
 
-Run after replacing branding/logo.png, branding/twilight.png or
-branding/trollface.png:
+Run after replacing any file in branding/:
     python tools/make_branding.py
 """
 from __future__ import annotations
@@ -26,12 +29,16 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 LOGO = ROOT / "branding" / "logo.png"
+SHIT = ROOT / "branding" / "shit.png"
+HUBERT = ROOT / "branding" / "hubert.png"
 APP_ICON = ROOT / "branding" / "AppIcon-1024.png"
 ICON_DIR = ROOT / "mod-tools" / "app-icons"
-BADGE_DIR = ROOT / "Swiftgram" / "SGAppBadgeAssets" / "Images.xcassets" / "TearsgramAppBadge.imageset"
 ASSETS_DIR = ROOT / "Swiftgram" / "SGAppBadgeAssets" / "Images.xcassets"
 TWILIGHT_SOURCE = ROOT / "branding" / "twilight.png"
 TROLLFACE_SOURCE = ROOT / "branding" / "trollface.png"
+
+ICON_SIZES = (("60@2x", 120), ("60@3x", 180), ("76", 76), ("76@2x", 152), ("83.5@2x", 167))
+ICON_PREVIEW = ICON_DIR / "NGCustom0-60@3x.png"
 
 DEEP = (11, 79, 39)
 MID = (22, 144, 63)
@@ -121,15 +128,14 @@ def build_icon(logo: Image.Image) -> Image.Image:
     return scaled
 
 
-def build_badge(logo: Image.Image) -> Image.Image:
-    """Near-black pill with the white tearsgram wordmark and no thumbnail."""
+def build_badge() -> Image.Image:
+    """Near-black pill with the white tearsgram wordmark, no rim, no thumbnail."""
     width, height = 279, 66
     badge = Image.new("RGBA", (width, height), (0, 0, 0, 0))
 
     gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     pixels = gradient.load()
     for x in range(width):
-        t = x / (width - 1)
         for y in range(height):
             v = y / (height - 1)
             pixels[x, y] = (
@@ -139,13 +145,7 @@ def build_badge(logo: Image.Image) -> Image.Image:
                 255,
             )
 
-    mask = Image.new("L", (width, height), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, width - 1, height - 1), radius=height // 2, fill=255)
-    badge.paste(gradient, (0, 0), mask)
-
-    draw = ImageDraw.Draw(badge)
-    # Hairline rim, like the system badge.
-    draw.rounded_rectangle((1, 1, width - 2, height - 2), radius=(height - 2) // 2, outline=(255, 255, 255, 30), width=2)
+    badge.paste(gradient, (0, 0), badge_pill_mask(width, height))
 
     draw = ImageDraw.Draw(badge)
     font = load_font(36, bold=True)
@@ -163,12 +163,28 @@ def build_badge(logo: Image.Image) -> Image.Image:
     return badge
 
 
-def alternate(base: Image.Image, tint: tuple[int, int, int, int] | None) -> Image.Image:
-    icon = base.convert("RGBA")
-    if tint is not None:
-        overlay = Image.new("RGBA", icon.size, tint)
-        icon = Image.alpha_composite(icon, overlay)
-    return icon.convert("RGB")
+def opaque(image: Image.Image) -> Image.Image:
+    """Home Screen icons must be opaque RGB: flatten any alpha onto white."""
+    if image.mode in ("RGBA", "LA", "P"):
+        rgba = image.convert("RGBA")
+        canvas = Image.new("RGB", rgba.size, (255, 255, 255))
+        canvas.paste(rgba, (0, 0), rgba)
+        return canvas
+    return image.convert("RGB")
+
+
+def save_icon_set(source: Image.Image, name: str) -> None:
+    artwork = opaque(source)
+    for suffix, dimension in ICON_SIZES:
+        save_png(artwork.resize((dimension, dimension), Image.LANCZOS), ICON_DIR / f"{name}-{suffix}.png")
+
+
+def remove_icon_set(name: str) -> None:
+    for suffix, _ in ICON_SIZES:
+        path = ICON_DIR / f"{name}-{suffix}.png"
+        if path.exists():
+            path.unlink()
+            print("  removed", path.relative_to(ROOT))
 
 
 def save_png(image: Image.Image, path: Path) -> None:
@@ -177,10 +193,16 @@ def save_png(image: Image.Image, path: Path) -> None:
     print("  ", path.relative_to(ROOT))
 
 
-def badge_pill_mask(width: int, height: int) -> Image.Image:
-    mask = Image.new("L", (width, height), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, width - 1, height - 1), radius=height // 2, fill=255)
-    return mask
+def badge_pill_mask(width: int, height: int, supersample: int = 4) -> Image.Image:
+    """Anti-aliased pill mask: drawn 4x larger and downsampled, so the edge is
+    smooth without any drawn rim or border."""
+    big = Image.new("L", (width * supersample, height * supersample), 0)
+    ImageDraw.Draw(big).rounded_rectangle(
+        (0, 0, width * supersample - 1, height * supersample - 1),
+        radius=(height * supersample) // 2,
+        fill=255,
+    )
+    return big.resize((width, height), Image.LANCZOS)
 
 
 def fit_badge_font(draw: ImageDraw.ImageDraw, text: str, max_width: int, start: int = 36) -> ImageFont.FreeTypeFont:
@@ -210,6 +232,9 @@ def build_photo_badge(
     scrim - how much black to lay over the photo (0-255) so white text reads
     white - how much white to lay over the photo (for dark-on-light artwork)
     chip  - draw a dark rounded plate behind the text
+
+    No rim is drawn: the pill is only the picture cut by a smooth mask, exactly
+    like the stock Swiftgram badges.
     """
     width, height = 279, 66
     photo = cover(Image.open(source).convert("RGB"), (width, height)).convert("RGBA")
@@ -222,7 +247,6 @@ def build_photo_badge(
     badge.paste(photo, (0, 0), badge_pill_mask(width, height))
 
     draw = ImageDraw.Draw(badge)
-    draw.rounded_rectangle((1, 1, width - 2, height - 2), radius=(height - 2) // 2, outline=(255, 255, 255, 46), width=2)
     if not text:
         return badge
 
@@ -279,27 +303,29 @@ def save_badge_imageset(image: Image.Image, name: str) -> None:
 
 
 def main() -> int:
-    if not LOGO.exists():
-        print(f"branding/logo.png not found, writing the default tearsgram wordmark")
+    primary = SHIT if SHIT.exists() else LOGO
+    if not primary.exists():
+        print("branding/shit.png and branding/logo.png are missing, writing the default tearsgram wordmark")
         LOGO.parent.mkdir(parents=True, exist_ok=True)
         default_logo().save(LOGO, "PNG", optimize=True)
+        primary = LOGO
 
-    logo = Image.open(LOGO).convert("RGB")
-    icon = build_icon(logo)
+    icon = build_icon(Image.open(primary).convert("RGB"))
     save_png(icon, APP_ICON)
+    save_png(icon.resize((180, 180), Image.LANCZOS), ICON_PREVIEW)
 
     variants = (
-        ("NGCustom1", None),
-        ("NGCustom2", (10, 90, 45, 70)),
-        ("NGCustom3", (20, 60, 120, 55)),
+        ("NGCustom1", LOGO),
+        ("NGCustom2", HUBERT),
     )
-    sizes = (("60@2x", 120), ("60@3x", 180), ("76", 76), ("76@2x", 152), ("83.5@2x", 167))
-    for name, tint in variants:
-        artwork = alternate(icon, tint)
-        for suffix, dimension in sizes:
-            save_png(artwork.resize((dimension, dimension), Image.LANCZOS), ICON_DIR / f"{name}-{suffix}.png")
+    for name, source in variants:
+        if source.exists():
+            save_icon_set(build_icon(Image.open(source).convert("RGB")), name)
+        else:
+            print(f"  {source.relative_to(ROOT)} not found, skipping {name}")
+    remove_icon_set("NGCustom3")
 
-    badge = build_badge(logo)
+    badge = build_badge()
     save_badge_imageset(badge, "TearsgramAppBadge")
 
     if TWILIGHT_SOURCE.exists():

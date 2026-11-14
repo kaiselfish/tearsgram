@@ -425,11 +425,34 @@ def verify(repo: Path) -> list[str]:
         problems.append("SGTelegramUIExtensions.swift: tg://tearsgram route is missing")
 
     icons = repo / "mod-tools/app-icons"
-    for name in ("NGCustom1", "NGCustom2", "NGCustom3"):
-        for suffix in ("60@2x", "60@3x", "76", "76@2x", "83.5@2x"):
+    icon_suffixes = ("60@2x", "60@3x", "76", "76@2x", "83.5@2x")
+    for name in ("NGCustom1", "NGCustom2"):
+        for suffix in icon_suffixes:
             file = icons / f"{name}-{suffix}.png"
             if not file.is_file():
                 problems.append(f"missing icon {file.relative_to(repo)}; run python tools/make_branding.py")
+    if not (icons / "NGCustom0-60@3x.png").is_file():
+        problems.append("missing icon mod-tools/app-icons/NGCustom0-60@3x.png; run python tools/make_branding.py")
+    for suffix in icon_suffixes:
+        stale = icons / f"NGCustom3-{suffix}.png"
+        if stale.is_file():
+            problems.append(f"stale icon {stale.relative_to(repo)}; run python tools/make_branding.py")
+
+    brand_ipa = repo / "mod-tools/brand-ipa.py"
+    if brand_ipa.is_file():
+        text = read(brand_ipa)
+        if "NGCustom3" in text:
+            problems.append("mod-tools/brand-ipa.py: NGCustom3 is still packaged")
+        if "DEFAULT_ICON_PREVIEW" not in text:
+            problems.append("mod-tools/brand-ipa.py: primary icon preview is not embedded")
+
+    mod_icons = repo / "Swiftgram/SGSettingsUI/Sources/SGModIconsController.swift"
+    if mod_icons.is_file():
+        text = read(mod_icons)
+        if "NGCustom0-60@3x" not in text:
+            problems.append("SGModIconsController.swift: default icon preview is not wired")
+        if "for index in 1 ... 3 {" in text:
+            problems.append("SGModIconsController.swift: hard-coded 1 ... 3 icon loop is still present")
 
     for relative in (
         "mod-tools/brand-ipa.py",

@@ -30,7 +30,9 @@ private enum SGModIconEntry: ItemListNodeEntry {
         switch self {
         case let .icon(index, title, selected, enabled):
             let image: UIImage?
-            if index == 0 {
+            if index == 0, let path = Bundle.main.path(forResource: "NGCustom0-60@3x", ofType: "png") {
+                image = UIImage(contentsOfFile: path)
+            } else if index == 0 {
                 image = UIImage(bundleImageName: "ModPrivacy")
             } else if let path = Bundle.main.path(forResource: "NGCustom\(index)-60@3x", ofType: "png") {
                 image = UIImage(contentsOfFile: path)
@@ -75,14 +77,16 @@ public func sgModIconsController(context: AccountContext) -> ViewController {
     let signal = combineLatest(context.sharedContext.presentationData, changed.get())
     |> map { data, _ -> (ItemListControllerState, (ItemListNodeState, Any)) in
         let ru = data.strings.baseLanguageCode.hasPrefix("ru")
-        let selected = selectedIconName
         let supported = UIApplication.shared.supportsAlternateIcons
         let alternatives = (Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any])?["CFBundleAlternateIcons"] as? [String: Any] ?? [:]
+        // Only icons that are really packaged in this build are listed. A stale
+        // selection (for an icon that was removed) is shown as Default.
+        let selected = selectedIconName.flatMap { alternatives[$0] != nil ? $0 : nil }
         var entries: [SGModIconEntry] = []
         entries.append(.icon(0, ru ? "Стандартная" : "Default", selected == nil, supported && !changing))
-        for index in 1 ... 3 {
+        for index in (1 ... 3).filter({ alternatives["NGCustom\($0)"] != nil }) {
             let name = "NGCustom\(index)"
-            entries.append(.icon(index, ru ? "Иконка \(index)" : "Icon \(index)", selected == name, supported && !changing && alternatives[name] != nil))
+            entries.append(.icon(index, ru ? "Иконка \(index)" : "Icon \(index)", selected == name, supported && !changing))
         }
         let notice: String
         if !supported {
@@ -90,7 +94,7 @@ public func sgModIconsController(context: AccountContext) -> ViewController {
         } else if alternatives["NGCustom1"] == nil {
             notice = ru ? "Эти иконки появятся после установки новой сборки IPA." : "These icons require installing the updated IPA."
         } else {
-            notice = ru ? "Меняет иконку приложения на рабочем столе. Стандартная возвращает исходный портрет. Верхний значок tearsgram остаётся прежним." : "Changes the Home Screen app icon. Default restores the original portrait. The top tearsgram badge stays unchanged."
+            notice = ru ? "Меняет иконку приложения на рабочем столе. Стандартная возвращает стандартную иконку сборки. Верхний значок tearsgram остаётся прежним." : "Changes the Home Screen app icon. Default restores the build's default icon. The top tearsgram badge stays unchanged."
         }
         entries.append(.notice(notice))
         let state = ItemListControllerState(presentationData: ItemListPresentationData(data), title: .text(ru ? "Иконка приложения" : "App icon"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: data.strings.Common_Back))

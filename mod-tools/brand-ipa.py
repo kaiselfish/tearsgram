@@ -7,7 +7,8 @@ from pathlib import Path, PurePosixPath
 
 BUNDLE_ID = "com.tearsgram.app"
 APP_NAME = "tearsgram"
-CUSTOM_ICONS = ("NGCustom1", "NGCustom2", "NGCustom3")
+CUSTOM_ICONS = ("NGCustom1", "NGCustom2")
+DEFAULT_ICON_PREVIEW = "NGCustom0-60@3x.png"
 ICON_DIRECTORY = Path(__file__).resolve().parent / "app-icons"
 
 
@@ -69,6 +70,10 @@ def brand(source: Path, destination: Path):
                 for suffix in ("60@2x", "60@3x", "76", "76@2x", "83.5@2x"):
                     filename = name + "-" + suffix + ".png"
                     output.write(ICON_DIRECTORY / filename, app_root + filename)
+            # Small preview of the primary icon, shown by the in-app icon picker.
+            preview = ICON_DIRECTORY / DEFAULT_ICON_PREVIEW
+            if preview.is_file():
+                output.write(preview, app_root + DEFAULT_ICON_PREVIEW)
     with zipfile.ZipFile(destination) as archive:
         assert archive.testzip() is None
         plist = plistlib.loads(archive.read(main))
