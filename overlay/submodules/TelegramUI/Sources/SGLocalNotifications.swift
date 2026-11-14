@@ -249,7 +249,11 @@ final class SGLocalNotificationManager {
     }
 
     func activate(sharedContext: SharedAccountContextImpl, wakeupManager: SharedWakeupManager) {
-        Queue.mainQueue().async {
+        // `[self]`: the outer closure runs on the main queue and the manager is a
+        // process-wide singleton, so an explicit strong capture is intentional
+        // here; a nested `[weak self]` inside an implicitly-strong closure is a
+        // Swift 6 error.
+        Queue.mainQueue().async { [self] in
             guard self.accountsDisposable == nil else {
                 return
             }
