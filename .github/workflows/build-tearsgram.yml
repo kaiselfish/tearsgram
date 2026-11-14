@@ -9,6 +9,10 @@ on:
       - branding/**
       - mod-tools/app-icons/**
       - Swiftgram/SGAppBadgeAssets/**
+      - Swiftgram/**
+      - submodules/**
+      - Telegram/**
+      - tools/**
   workflow_dispatch:
     inputs:
       mode:
