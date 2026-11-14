@@ -9,6 +9,10 @@
 | `Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift` | `import SGProUI`; `SGModLink.appBadge`; строка «Значок приложения / App badge» в разделе «Оформление»; переход на `sgAppBadgeSettingsController`; заголовок экрана `Nigga` → `tearsgram` |
 | `Swiftgram/SGSettingsUI/Sources/SGSettingsController.swift` | `SGDisclosureLink.tearsgram`; заголовок-секция `tearsgram` и ссылка `Приватность, удалённые сообщения, значок / Privacy, deleted messages, app badge` вверху списка; в обработчике `link` — `pushControllerImpl?(sgModSettingsController(context: context))` |
 | `Swiftgram/SGTelegramUIExtensions/Sources/SGTelegramUIExtensions.swift` | внутренние роуты `case "tearsgram", "mod":` → `sgModSettingsController` (рядом с существующим `case "settings":`) |
+| `Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift` | Новые настройки `localNotifications` и `backgroundKeepAlive` (обе включены по умолчанию) |
+| `submodules/TelegramUI/Sources/SGLocalNotifications.swift` | Новый файл. Локальные уведомления вместо невозможного APNs: сторож `pollStateUpdateCompletion()`, беззвучная дорожка, продление фонового времени, `UNNotificationRequest` с ключами `accountId`/`peerId`/`messageId.*` |
+| `submodules/TelegramUI/Sources/AppDelegate.swift` | Активация менеджера уведомлений, переключение фона/форграунда, доставка уведомлений в фоновой задаче `deletedMessagesRefresh` |
+| `Telegram/Telegram-iOS/Info.plist`, `InfoBazel.plist` | `BGTaskSchedulerPermittedIdentifiers`: добавлены `.deletedMessagesRefresh` и `.cleanup` (без них iOS не запускает задачу и пишет в лог отказ) |
 | `Swiftgram/SGSettingsUI/BUILD` | зависимость `//Swiftgram/SGProUI:SGProUI` |
 | `Telegram/BUILD` | все `<string>Niggagram</string>` → `<string>tearsgram</string>`, `Open in Swiftgram` → `Open in tearsgram` |
 | `submodules/TelegramUI/Sources/AppDelegate.swift` | текст ошибки хранилища `Niggagram ...` → `tearsgram ...` |
@@ -69,3 +73,43 @@ runtime-рендерер используют ровно этот размер. 
 `mod-tools/brand-ipa.py` регистрирует ровно `NGCustom1` и `NGCustom2` и кладёт рядом
 `NGCustom0-60@3x.png` — превью главной иконки для списка. Экрана «Иконка 3» больше нет:
 строки строятся по фактическому содержимому `CFBundleAlternateIcons`.
+
+## Уведомления: почему пуша нет и что вместо него
+
+Переподписанный `.ipa` (Sideloadly + бесплатный Apple ID) не получает entitlement
+`aps-environment`: в профиле его нет, а сам профиль создан для `com.tearsgram.app`.
+Серверы Telegram отправляют пуши в тему `ph.telegra.Telegraph`, подменить её чужим
+bundle id нельзя. Итог: `registerForRemoteNotifications()` не даёт токен, и ни один
+серверный пуш до устройства не доходит — это ограничение подписи, а не баг клиента.
+
+Поэтому уведомления показывает сам клиент, пока он жив:
+
+1. `SGAccountNotificationWatcher` подписывается на `pollStateUpdateCompletion()`
+   каждого аккаунта. Сигнал одноразовый (отдаёт `[MessageId]` и завершается), поэтому
+   после каждого события подписка сразу восстанавливается.
+2. На событии `SGLocalNotificationManager` читает `tailChatListView(groupId: .root, count: 40)`
+   и по каждому чату с непрочитанными сравнивает верхний id с сохранённым в
+   `UserDefaults` (`sg.localNotifications.lastIds.<accountId>`). Уведомление ставится, если
+   id вырос, сообщение входящее, чат не заглушён, приложение не на переднем плане и
+   сообщению меньше 300 секунд.
+3. Текст уведомления — `title` из имени чата, `body` из текста или типа вложения,
+   в группах и каналах — с именем автора. `threadIdentifier` и `identifier` содержат
+   `accountId` и `peerId`, `userInfo` — те же ключи, что разбирает
+   `AppDelegate.userNotificationCenter(_:didReceive:)`, поэтому тап открывает нужный чат
+   и сообщение. Значок приложения — суммарное число непрочитанных (`setBadgeCount`, iOS 16+).
+4. `SGBackgroundSilenceAudio` играет сгенерированный WAV из нулевых сэмплов
+   (8 кГц, 16 бит, 1 с, `numberOfLoops = -1`) в категории `.playback` с `.mixWithOthers`.
+   `UIBackgroundModes` уже содержит `audio`, поэтому процесс не приостанавливается.
+5. Раз в 10 секунд таймер вызывает `allowBackgroundTimeExtension(timeout: 30, extendNow: true)`
+   и ставит `shouldBeServiceTaskMaster = .always`. Без этого `SharedWakeupManager.updateAccounts`
+   через несколько секунд после ухода в фон снимает мастерство и останавливает апдейты.
+
+Ограничения, которые нельзя обойти кодом:
+
+- после принудительного закрытия (свайп вверх) уведомлений нет до следующего запуска:
+  локальные уведомления некому создавать, а серверный пуш недоступен;
+- сканируется только основной список чатов (`.root`), архивные чаты не покрыты;
+- беззвучная дорожка и продление фонового времени расходуют батарею; оба поведения
+  отключаются в `Настройки → Swiftgram → tearsgram → Уведомления`;
+- при звонке или будильнике аудиосессия прерывается; после окончания прерывания
+  плеер запускается снова (наблюдатель `AVAudioSession.interruptionNotification`).

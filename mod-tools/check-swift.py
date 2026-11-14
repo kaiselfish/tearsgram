@@ -48,6 +48,7 @@ paths = [
     "mod-tools/tests/ICloudFileAccessTests.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift",
     "submodules/TelegramUI/Sources/AppDelegate.swift",
+    "submodules/TelegramUI/Sources/SGLocalNotifications.swift",
     "mod-tools/tests/SGAppStorageTests.swift",
     "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift",
     "submodules/TelegramCore/Sources/Account/AccountManager.swift",

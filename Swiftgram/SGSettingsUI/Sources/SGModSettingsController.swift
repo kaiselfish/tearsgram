@@ -16,10 +16,12 @@ private enum SGModSection: Int32, SGItemListSection {
     case deleted
     case camera
     case voice
+    case notifications
 }
 
 private enum SGModToggle: Hashable {
     case pseudoPro, ghost, deleted, unlimitedArchive, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
+    case localNotifications, backgroundKeepAlive
 }
 
 private enum SGModLink: Hashable {
@@ -67,6 +69,10 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             }
         case .video60:
             SGPrivacySettings.videoNotes60FPS = value
+        case .localNotifications:
+            SGPrivacySettings.localNotifications = value
+        case .backgroundKeepAlive:
+            SGPrivacySettings.backgroundKeepAlive = value
         case .deleted:
             SGPrivacySettings.keepDeletedMessages = value
             if !value {
@@ -158,6 +164,10 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         let archiveLimitDescription = SGPrivacySettings.unlimitedDeletedMessages ? (ru ? "без ограничений по количеству" : "no entry count limit") : (ru ? "до \(SGPrivacySettings.deletedMessagesLimit) записей" : "up to \(SGPrivacySettings.deletedMessagesLimit) entries")
         entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Введите целое число от 1 до 10000 и нажмите «Сохранить». Сохранённый лимит: \(SGPrivacySettings.deletedMessagesLimit). Бесконечный архив игнорирует этот лимит. При его выключении старейшие записи сверх лимита удаляются из архива и чатов. Размер архива ограничен свободным местом на устройстве." : "Enter an integer from 1 to 10000, then tap Save. Saved limit: \(SGPrivacySettings.deletedMessagesLimit). Unlimited archive ignores this limit. Turning it off removes the oldest entries above the saved limit from the archive and chats. Archive size depends on available device storage."))
         entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: \(archiveLimitDescription), включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: \(archiveLimitDescription), including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
+        entries.append(.header(id: counter.count, section: .notifications, text: ru ? "Уведомления" : "Notifications", badge: nil))
+        entries.append(.toggle(id: counter.count, section: .notifications, settingName: .localNotifications, value: SGPrivacySettings.localNotifications, text: ru ? "Локальные уведомления" : "Local notifications", enabled: true))
+        entries.append(.toggle(id: counter.count, section: .notifications, settingName: .backgroundKeepAlive, value: SGPrivacySettings.backgroundKeepAlive, text: ru ? "Не засыпать в фоне" : "Stay awake in background", enabled: SGPrivacySettings.localNotifications))
+        entries.append(.notice(id: counter.count, section: .notifications, text: ru ? "Пуш-уведомления от серверов Telegram в этой сборке недоступны: переподписанная подпись не даёт доступ к APNs, а bundle id com.tearsgram.app не совпадает с темой пушей Telegram. Поэтому уведомления показывает сам клиент, пока остаётся запущенным. С включённым «Не засыпать в фоне» он держит соединение и тихо играет беззвучную дорожку (расход батареи выше). После принудительного закрытия из свайпа уведомления не приходят до следующего запуска." : "Push from Telegram servers cannot work in this build: a re-signed profile has no APNs access, and com.tearsgram.app does not match the push topic of Telegram. The client therefore posts its own notifications while it stays running. With Stay awake in background enabled it keeps the connection and plays a silent track (higher battery use). After a swipe-up force quit no notifications arrive until the next launch."))
         entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60, value: SGPrivacySettings.videoNotes60FPS, text: ru ? "Кружки: 60 FPS" : "Video messages: 60 FPS", enabled: true))
         entries.append(.notice(id: counter.count, section: .camera, text: ru ? "Выключено — стандартные 30 FPS. В режиме 60 FPS используется одна камера: фронтальная или задняя, с переключением при записи. Камера должна поддерживать формат 60 FPS. Изменение применяется при следующем открытии записи кружка." : "Off uses the default 30 FPS. 60 FPS uses one camera at a time, front or back, with switching while recording. A supported 60 FPS camera format is required. Changes apply the next time video-message recording opens."))
         entries.append(.header(id: counter.count, section: .voice, text: ru ? "Голосовые сообщения" : "Voice messages", badge: nil))

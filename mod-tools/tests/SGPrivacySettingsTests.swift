@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "pastavibeEmojiStatusFileId", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "pastavibeEmojiStatusFileId", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS", "localNotifications", "backgroundKeepAlive"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -89,11 +89,19 @@ struct SGPrivacySettingsTests {
         SGPrivacySettings.videoNotes60FPS = true
         SGPrivacySettings.backgroundDeletedMessages = true
         precondition(SGPrivacySettings.videoNotes60FPS && SGPrivacySettings.backgroundDeletedMessages)
+        precondition(SGPrivacySettings.localNotifications && SGPrivacySettings.backgroundKeepAlive, "Local notifications and the background keep-alive must default to on: without APNs they are the only way a message reaches the user")
+        SGPrivacySettings.localNotifications = false
+        SGPrivacySettings.backgroundKeepAlive = false
+        precondition(!SGPrivacySettings.localNotifications && !SGPrivacySettings.backgroundKeepAlive)
+        precondition(!defaults.bool(forKey: "sg.mod.localNotifications") && !defaults.bool(forKey: "sg.mod.backgroundKeepAlive"))
+        SGPrivacySettings.localNotifications = true
+        SGPrivacySettings.backgroundKeepAlive = true
+        precondition(SGPrivacySettings.localNotifications && SGPrivacySettings.backgroundKeepAlive)
         for key in keys { defaults.removeObject(forKey: key) }
         defaults.set(true, forKey: "sg.mod.hideOnline")
         precondition(SGPrivacySettings.ghostMode, "Existing ghost mode must migrate")
         SGPrivacySettings.ghostMode = false
         precondition(!SGPrivacySettings.hideOnline)
-        print("PASS: unlimited archive persistence and eviction policy; independent ghost controls, migration, story views, call exclusion, FPS/background preferences")
+        print("PASS: unlimited archive persistence and eviction policy; independent ghost controls, migration, story views, call exclusion, FPS/background preferences; local notification defaults")
     }
 }

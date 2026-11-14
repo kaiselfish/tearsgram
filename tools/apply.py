@@ -311,7 +311,218 @@ def patch_url_routes(repo: Path) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# 5. Global brand rename inside code directories
+# 5. Local notifications: APNs is unavailable for a re-signed build, so the
+#    client posts its own notifications while it is alive in the background.
+# --------------------------------------------------------------------------- #
+
+LOCAL_NOTIFICATIONS_SETTINGS_OLD = """    public static var videoNotes60FPS: Bool {
+        get { preference("sg.mod.videoNotes60FPS", defaultValue: false) }
+        set { set(newValue, for: "sg.mod.videoNotes60FPS") }
+    }
+}"""
+
+LOCAL_NOTIFICATIONS_SETTINGS_NEW = """    public static var videoNotes60FPS: Bool {
+        get { preference("sg.mod.videoNotes60FPS", defaultValue: false) }
+        set { set(newValue, for: "sg.mod.videoNotes60FPS") }
+    }
+
+    /// A re-signed build never receives the aps-environment entitlement, so the
+    /// client renders its own notifications instead of server push.
+    public static var localNotifications: Bool {
+        get { preference("sg.mod.localNotifications", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.localNotifications") }
+    }
+
+    /// Keeps the process running in the background with looping silent audio so
+    /// the update loop stays connected and new messages reach the postbox.
+    public static var backgroundKeepAlive: Bool {
+        get { preference("sg.mod.backgroundKeepAlive", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.backgroundKeepAlive") }
+    }
+}"""
+
+BG_TASK_OLD = """	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>
+	</array>"""
+
+BG_TASK_NEW = """	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).deletedMessagesRefresh</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).cleanup</string>
+	</array>"""
+
+
+def patch_local_notification_settings(repo: Path) -> bool:
+    path = repo / "Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift"
+    text = read(path)
+    if "sg.mod.localNotifications" in text:
+        return False
+    require(LOCAL_NOTIFICATIONS_SETTINGS_OLD in text, f"{path}: videoNotes60FPS block not found")
+    write(path, text.replace(LOCAL_NOTIFICATIONS_SETTINGS_OLD, LOCAL_NOTIFICATIONS_SETTINGS_NEW, 1))
+    return True
+
+
+def patch_notification_settings(repo: Path) -> bool:
+    path = repo / "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift"
+    text = read(path)
+    original = text
+
+    text = replace_once(
+        text,
+        "    case camera\n    case voice\n}",
+        "    case camera\n    case voice\n    case notifications\n}",
+        path,
+        "SGModSection.notifications",
+        marker="case notifications\n}",
+    )
+
+    text = replace_once(
+        text,
+        "    case pseudoPro, ghost, deleted, unlimitedArchive, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions\n}",
+        "    case pseudoPro, ghost, deleted, unlimitedArchive, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions\n"
+        "    case localNotifications, backgroundKeepAlive\n}",
+        path,
+        "SGModToggle.localNotifications",
+        marker="case localNotifications, backgroundKeepAlive\n}",
+    )
+
+    text = replace_once(
+        text,
+        "        case .video60:\n            SGPrivacySettings.videoNotes60FPS = value",
+        "        case .video60:\n            SGPrivacySettings.videoNotes60FPS = value\n"
+        "        case .localNotifications:\n            SGPrivacySettings.localNotifications = value\n"
+        "        case .backgroundKeepAlive:\n            SGPrivacySettings.backgroundKeepAlive = value",
+        path,
+        "notification toggles",
+        marker="case .localNotifications:",
+    )
+
+    anchor = (
+        '        entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60, '
+        'value: SGPrivacySettings.videoNotes60FPS, text: ru ? "Кружки: 60 FPS" : "Video messages: 60 FPS", enabled: true))'
+    )
+    addition = (
+        '        entries.append(.header(id: counter.count, section: .notifications, text: ru ? "Уведомления" : "Notifications", badge: nil))\n'
+        "        entries.append(.toggle(id: counter.count, section: .notifications, settingName: .localNotifications, value: "
+        'SGPrivacySettings.localNotifications, text: ru ? "Локальные уведомления" : "Local notifications", enabled: true))\n'
+        "        entries.append(.toggle(id: counter.count, section: .notifications, settingName: .backgroundKeepAlive, value: "
+        'SGPrivacySettings.backgroundKeepAlive, text: ru ? "Не засыпать в фоне" : "Stay awake in background", enabled: SGPrivacySettings.localNotifications))\n'
+        "        entries.append(.notice(id: counter.count, section: .notifications, text: ru ? "
+        '"Пуш-уведомления от серверов Telegram в этой сборке недоступны: переподписанная подпись не даёт доступ к APNs, '
+        'а bundle id com.tearsgram.app не совпадает с темой пушей Telegram. Поэтому уведомления показывает сам клиент, '
+        'пока остаётся запущенным. С включённым «Не засыпать в фоне» он держит соединение и тихо играет беззвучную дорожку '
+        '(расход батареи выше). После принудительного закрытия из свайпа уведомления не приходят до следующего запуска." '
+        ': "Push from Telegram servers cannot work in this build: a re-signed profile has no APNs access, and '
+        "com.tearsgram.app does not match the push topic of Telegram. The client therefore posts its own notifications "
+        "while it stays running. With Stay awake in background enabled it keeps the connection and plays a silent track "
+        '(higher battery use). After a swipe-up force quit no notifications arrive until the next launch."))\n'
+        + anchor
+    )
+    text = replace_once(text, anchor, addition, path, "notification rows", marker="section: .notifications, settingName: .localNotifications")
+
+    if text != original:
+        write(path, text)
+        return True
+    return False
+
+
+def patch_local_notifications(repo: Path) -> bool:
+    path = repo / "submodules/TelegramUI/Sources/AppDelegate.swift"
+    text = read(path)
+    original = text
+
+    text = replace_once(
+        text,
+        "            let sharedApplicationContext = SharedApplicationContext(sharedContext: sharedContext, notificationManager: notificationManager, wakeupManager: wakeupManager)",
+        "            let sharedApplicationContext = SharedApplicationContext(sharedContext: sharedContext, notificationManager: notificationManager, wakeupManager: wakeupManager)\n"
+        "            SGLocalNotificationManager.shared.activate(sharedContext: sharedContext, wakeupManager: wakeupManager)",
+        path,
+        "local notification activation",
+        marker="SGLocalNotificationManager.shared.activate(",
+    )
+
+    text = replace_once(
+        text,
+        "    func handleWillEnterForeground() {\n",
+        "    func handleWillEnterForeground() {\n        SGLocalNotificationManager.shared.setForeground(true)\n",
+        path,
+        "local notification foreground",
+        marker="SGLocalNotificationManager.shared.setForeground(true)",
+    )
+
+    text = replace_once(
+        text,
+        "    func handleDidEnterBackground() {\n        self.scheduleDeletedMessagesRefresh()",
+        "    func handleDidEnterBackground() {\n        SGLocalNotificationManager.shared.setForeground(false)\n        self.scheduleDeletedMessagesRefresh()",
+        path,
+        "local notification background",
+        marker="SGLocalNotificationManager.shared.setForeground(false)",
+    )
+
+    text = replace_once(
+        text,
+        "                guard SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages else {\n"
+        "                    task.setTaskCompleted(success: true)\n"
+        "                    return\n"
+        "                }",
+        "                guard SGPrivacySettings.localNotifications || (SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages) else {\n"
+        "                    task.setTaskCompleted(success: true)\n"
+        "                    return\n"
+        "                }",
+        path,
+        "background refresh gate",
+        marker="guard SGPrivacySettings.localNotifications || (SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages) else {\n                    task.setTaskCompleted",
+    )
+
+    text = replace_once(
+        text,
+        "                    context.wakeupManager.replaceCurrentExtensionWithExternalTime(completion: { finish(true) }, timeout: 25.0)",
+        "                    context.wakeupManager.replaceCurrentExtensionWithExternalTime(completion: {\n"
+        "                        SGLocalNotificationManager.shared.deliverNow(completion: {\n"
+        "                            finish(true)\n"
+        "                        })\n"
+        "                    }, timeout: 25.0)",
+        path,
+        "background refresh notifications",
+        marker="SGLocalNotificationManager.shared.deliverNow(",
+    )
+
+    text = replace_once(
+        text,
+        '        let identifier = "\\(Bundle.main.bundleIdentifier!).deletedMessagesRefresh"\n'
+        "        guard SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages else {",
+        '        let identifier = "\\(Bundle.main.bundleIdentifier!).deletedMessagesRefresh"\n'
+        "        guard SGPrivacySettings.localNotifications || (SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages) else {",
+        path,
+        "background refresh scheduling",
+        marker="SGPrivacySettings.localNotifications || (SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages) else {\n            BGTaskScheduler",
+    )
+
+    if text != original:
+        write(path, text)
+        return True
+    return False
+
+
+def patch_background_tasks(repo: Path) -> bool:
+    changed = False
+    for relative in ("Telegram/Telegram-iOS/Info.plist", "Telegram/Telegram-iOS/InfoBazel.plist"):
+        path = repo / relative
+        if not path.is_file():
+            raise PatchError(f"{relative}: not found")
+        text = read(path)
+        if "deletedMessagesRefresh" in text:
+            continue
+        require(BG_TASK_OLD in text, f"{path}: BGTaskSchedulerPermittedIdentifiers block not found")
+        write(path, text.replace(BG_TASK_OLD, BG_TASK_NEW, 1))
+        changed = True
+    return changed
+
+
+# --------------------------------------------------------------------------- #
+# 6. Global brand rename inside code directories
 # --------------------------------------------------------------------------- #
 
 TEXT_SUFFIXES = {".swift", ".py", ".plist", ".json", ".strings", ".bzl", ".build", ".sh", ".txt"}
@@ -396,6 +607,7 @@ def verify(repo: Path) -> list[str]:
             ("case appBadge\n}", 1),
             ("case .appBadge:", 1),
             ("link: .appBadge", 1),
+            ("section: .notifications, settingName: .localNotifications", 1),
         ):
             actual = text.count(token)
             if actual != expected:
@@ -423,6 +635,54 @@ def verify(repo: Path) -> list[str]:
     routes = repo / "Swiftgram/SGTelegramUIExtensions/Sources/SGTelegramUIExtensions.swift"
     if routes.is_file() and read(routes).count('case "tearsgram", "mod":') != 1:
         problems.append("SGTelegramUIExtensions.swift: tg://tearsgram route is missing")
+
+    local_notifications = repo / "submodules/TelegramUI/Sources/SGLocalNotifications.swift"
+    if not local_notifications.is_file():
+        problems.append("SGLocalNotifications.swift is missing from submodules/TelegramUI/Sources")
+    else:
+        text = read(local_notifications)
+        for token in ("SGBackgroundSilenceAudio", "SGAccountNotificationWatcher", "setBadgeCount", "threadIdentifier"):
+            if token not in text:
+                problems.append(f"SGLocalNotifications.swift: {token} is missing")
+
+    privacy_settings = repo / "Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift"
+    if privacy_settings.is_file():
+        text = read(privacy_settings)
+        # Each key legitimately appears twice: once in the getter and once in the setter.
+        for key, declaration in (
+            ("sg.mod.localNotifications", "public static var localNotifications: Bool"),
+            ("sg.mod.backgroundKeepAlive", "public static var backgroundKeepAlive: Bool"),
+        ):
+            if text.count(key) != 2:
+                problems.append(f"SGPrivacySettings.swift: {key!r} appears {text.count(key)} times, expected 2")
+            if text.count(declaration) != 1:
+                problems.append(
+                    f"SGPrivacySettings.swift: {declaration!r} appears {text.count(declaration)} times, expected 1"
+                )
+
+    app_delegate = repo / "submodules/TelegramUI/Sources/AppDelegate.swift"
+    if app_delegate.is_file():
+        text = read(app_delegate)
+        for token in (
+            "SGLocalNotificationManager.shared.activate(",
+            "SGLocalNotificationManager.shared.setForeground(true)",
+            "SGLocalNotificationManager.shared.setForeground(false)",
+            "SGLocalNotificationManager.shared.deliverNow(",
+        ):
+            if text.count(token) != 1:
+                problems.append(f"AppDelegate.swift: {token!r} appears {text.count(token)} times, expected 1")
+        if "SGPrivacySettings.localNotifications || (SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages)" not in text:
+            problems.append("AppDelegate.swift: background refresh does not run for local notifications")
+
+    for relative in ("Telegram/Telegram-iOS/Info.plist", "Telegram/Telegram-iOS/InfoBazel.plist"):
+        path = repo / relative
+        if not path.is_file():
+            problems.append(f"missing {relative}")
+            continue
+        text = read(path)
+        for identifier in ("refresh", "deletedMessagesRefresh", "cleanup"):
+            if f"$(PRODUCT_BUNDLE_IDENTIFIER).{identifier}</string>" not in text:
+                problems.append(f"{relative}: $(PRODUCT_BUNDLE_IDENTIFIER).{identifier} is not a permitted background task")
 
     icons = repo / "mod-tools/app-icons"
     icon_suffixes = ("60@2x", "60@3x", "76", "76@2x", "83.5@2x")
@@ -489,6 +749,10 @@ def main() -> int:
         build_changed = patch_settings_build(repo)
         swiftgram_settings_changed = patch_swiftgram_settings(repo)
         routes_changed = patch_url_routes(repo)
+        notification_settings_changed = patch_local_notification_settings(repo)
+        notification_ui_changed = patch_notification_settings(repo)
+        local_notifications_changed = patch_local_notifications(repo)
+        background_tasks_changed = patch_background_tasks(repo)
         renamed = brand_rename(repo)
     except PatchError as error:
         print(f"error: {error}", file=sys.stderr)
@@ -502,6 +766,10 @@ def main() -> int:
     print("SGSettingsUI/BUILD patched:", build_changed)
     print("SGSettingsController.swift patched:", swiftgram_settings_changed)
     print("SGTelegramUIExtensions.swift patched:", routes_changed)
+    print("SGPrivacySettings.swift patched:", notification_settings_changed)
+    print("notification settings rows patched:", notification_ui_changed)
+    print("AppDelegate.swift local notifications patched:", local_notifications_changed)
+    print("background task identifiers patched:", background_tasks_changed)
     print("files rebranded:", len(renamed))
     for name in renamed:
         print("  ~", name)

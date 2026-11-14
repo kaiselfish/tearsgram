@@ -1342,6 +1342,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 return sharedContext.currentPresentationData.with({ $0 })
             })
             let sharedApplicationContext = SharedApplicationContext(sharedContext: sharedContext, notificationManager: notificationManager, wakeupManager: wakeupManager)
+            SGLocalNotificationManager.shared.activate(sharedContext: sharedContext, wakeupManager: wakeupManager)
             sharedApplicationContext.sharedContext.mediaManager.overlayMediaManager.attachOverlayMediaController(sharedApplicationContext.overlayMediaController)
             
             return accountManager.transaction { transaction -> (SharedApplicationContext, LoggingSettings) in
@@ -1741,7 +1742,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     return
                 }
                 self.scheduleDeletedMessagesRefresh()
-                guard SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages else {
+                guard SGPrivacySettings.localNotifications || (SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages) else {
                     task.setTaskCompleted(success: true)
                     return
                 }
@@ -1763,7 +1764,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     // Reuse Telegram's network/difference machinery; do not run
                     // a fake audio session or an unbounded background loop.
                     context.wakeupManager.allowBackgroundTimeExtension(timeout: 25.0, extendNow: true)
-                    context.wakeupManager.replaceCurrentExtensionWithExternalTime(completion: { finish(true) }, timeout: 25.0)
+                    context.wakeupManager.replaceCurrentExtensionWithExternalTime(completion: {
+                        SGLocalNotificationManager.shared.deliverNow(completion: {
+                            finish(true)
+                        })
+                    }, timeout: 25.0)
                 }))
             }
             
@@ -2198,7 +2203,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     private func scheduleDeletedMessagesRefresh() {
         guard #available(iOS 13.0, *) else { return }
         let identifier = "\(Bundle.main.bundleIdentifier!).deletedMessagesRefresh"
-        guard SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages else {
+        guard SGPrivacySettings.localNotifications || (SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages) else {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
             return
         }
@@ -2212,6 +2217,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     }
 
     func handleDidEnterBackground() {
+        SGLocalNotificationManager.shared.setForeground(false)
         self.scheduleDeletedMessagesRefresh()
         let _ = (self.sharedContextPromise.get()
         |> take(1)
@@ -2264,6 +2270,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     }
 
     func handleWillEnterForeground() {
+        SGLocalNotificationManager.shared.setForeground(true)
         if self.isActiveValue {
             self.isInForegroundValue = true
             self.isInForegroundPromise.set(true)

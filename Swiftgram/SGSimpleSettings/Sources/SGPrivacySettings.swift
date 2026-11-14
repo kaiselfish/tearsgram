@@ -149,4 +149,18 @@ public enum SGPrivacySettings {
         get { preference("sg.mod.videoNotes60FPS", defaultValue: false) }
         set { set(newValue, for: "sg.mod.videoNotes60FPS") }
     }
+
+    /// A re-signed build never receives the aps-environment entitlement, so the
+    /// client renders its own notifications instead of server push.
+    public static var localNotifications: Bool {
+        get { preference("sg.mod.localNotifications", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.localNotifications") }
+    }
+
+    /// Keeps the process running in the background with looping silent audio so
+    /// the update loop stays connected and new messages reach the postbox.
+    public static var backgroundKeepAlive: Bool {
+        get { preference("sg.mod.backgroundKeepAlive", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.backgroundKeepAlive") }
+    }
 }
