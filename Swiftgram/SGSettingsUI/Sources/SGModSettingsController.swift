@@ -23,6 +23,7 @@ private enum SGModSection: Int32, SGItemListSection {
 private enum SGModToggle: Hashable {
     case pseudoPro, ghost, deleted, unlimitedArchive, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
     case localNotifications, backgroundKeepAlive
+    case keepViewOnce
 }
 
 private enum SGModLink: Hashable {
@@ -80,6 +81,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
                 // Remove only locally retained, server-deleted rows from this account.
                 let _ = sgRemoveRetainedMessages(postbox: context.account.postbox).start()
             }
+        case .keepViewOnce:
+            SGPrivacySettings.keepViewOnceMedia = value
         }
         changed.set(true)
     }, setOneFromManyValue: { setting in
@@ -206,6 +209,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         let archiveLimitDescription = SGPrivacySettings.unlimitedDeletedMessages ? (ru ? "без ограничений по количеству" : "no entry count limit") : (ru ? "до \(SGPrivacySettings.deletedMessagesLimit) записей" : "up to \(SGPrivacySettings.deletedMessagesLimit) entries")
         entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Введите целое число от 1 до 10000 и нажмите «Сохранить». Сохранённый лимит: \(SGPrivacySettings.deletedMessagesLimit). Бесконечный архив игнорирует этот лимит. При его выключении старейшие записи сверх лимита удаляются из архива и чатов. Размер архива ограничен свободным местом на устройстве." : "Enter an integer from 1 to 10000, then tap Save. Saved limit: \(SGPrivacySettings.deletedMessagesLimit). Unlimited archive ignores this limit. Turning it off removes the oldest entries above the saved limit from the archive and chats. Archive size depends on available device storage."))
         entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: \(archiveLimitDescription), включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: \(archiveLimitDescription), including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
+        entries.append(.toggle(id: counter.count, section: .deleted, settingName: .keepViewOnce, value: SGPrivacySettings.keepViewOnceMedia, text: ru ? "Одноразовые фото и видео" : "Keep one-time photos and videos", enabled: true))
+        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "После просмотра одноразовое фото или видео остаётся в чате как обычное вложение: его можно открыть снова, переслать или сохранить. Отметка о просмотре всё равно уходит отправителю. Работает для входящих в облачных чатах; секретные чаты не затрагиваются." : "After viewing, a one-time photo or video stays in the chat as an ordinary attachment: it can be opened again, forwarded or saved. The read receipt is still sent to the sender. Works for incoming media in cloud chats; secret chats are not affected."))
         entries.append(.header(id: counter.count, section: .notifications, text: ru ? "Уведомления" : "Notifications", badge: nil))
         entries.append(.toggle(id: counter.count, section: .notifications, settingName: .localNotifications, value: SGPrivacySettings.localNotifications, text: ru ? "Локальные уведомления" : "Local notifications", enabled: true))
         entries.append(.toggle(id: counter.count, section: .notifications, settingName: .backgroundKeepAlive, value: SGPrivacySettings.backgroundKeepAlive, text: ru ? "Не засыпать в фоне" : "Stay awake in background", enabled: SGPrivacySettings.localNotifications))

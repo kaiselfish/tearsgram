@@ -6,6 +6,16 @@ import MtProtoKit
 
 private typealias SignalKitTimer = SwiftSignalKit.Timer
 
+/// tearsgram: the toggle lives in the Swiftgram settings module, which sits
+/// above TelegramCore in the build graph, so read the raw defaults key here.
+func sgKeepViewOnceMediaEnabled() -> Bool {
+    let defaults = UserDefaults.standard
+    if defaults.object(forKey: "sg.mod.keepViewOnce") == nil {
+        return true
+    }
+    return defaults.bool(forKey: "sg.mod.keepViewOnce")
+}
+
 private final class ManagedAutoremoveMessageOperationsHelper {
     var entry: (TimestampBasedMessageAttributesEntry, MetaDisposable)?
     
@@ -87,6 +97,22 @@ func managedAutoremoveMessageOperations(network: Network, postbox: Postbox, isRe
                             _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: deletable)
                             // The retained row has no TTL attribute. Explicitly
                             // remove the timer entry to avoid scheduling it again.
+                            transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
+                        } else if sgKeepViewOnceMediaEnabled(), message.flags.contains(.Incoming), message.containsSecretMedia, let autoclear = message.autoclearAttribute, autoclear.timeout == viewOnceTimeout {
+                            // tearsgram: a one-time photo or video has just been
+                            // viewed. Drop the one-time attributes and keep the
+                            // media, so the message turns into an ordinary
+                            // attachment instead of an expired placeholder.
+                            transaction.updateMessage(message.id, update: { currentMessage in
+                                var storeForwardInfo: StoreMessageForwardInfo?
+                                if let forwardInfo = currentMessage.forwardInfo {
+                                    storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+                                }
+                                var updatedAttributes = currentMessage.attributes
+                                updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
+                                updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
+                                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media))
+                            })
                             transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
                         } else {
                             transaction.updateMessage(message.id, update: { currentMessage in

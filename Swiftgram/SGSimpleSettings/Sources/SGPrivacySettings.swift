@@ -181,4 +181,12 @@ public enum SGPrivacySettings {
         }
         return String(format: "%02d:00 - %02d:00", start, end)
     }
+
+    /// One-time photos and videos stay in the chat after they are opened.
+    /// Telegram marks them consumed and replaces the media with a placeholder;
+    /// the client skips that step and drops the one-time attributes instead.
+    public static var keepViewOnceMedia: Bool {
+        get { preference("sg.mod.keepViewOnce", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.keepViewOnce") }
+    }
 }

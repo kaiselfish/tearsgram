@@ -375,6 +375,75 @@ QUIET_HOURS_SETTINGS_NEW = """    /// Keeps the process running in the backgroun
     }
 }"""
 
+KEEP_VIEW_ONCE_SETTINGS_OLD = """        return String(format: "%02d:00 - %02d:00", start, end)
+    }
+}"""
+
+KEEP_VIEW_ONCE_SETTINGS_NEW = """        return String(format: "%02d:00 - %02d:00", start, end)
+    }
+
+    /// One-time photos and videos stay in the chat after they are opened.
+    /// Telegram marks them consumed and replaces the media with a placeholder;
+    /// the client skips that step and drops the one-time attributes instead.
+    public static var keepViewOnceMedia: Bool {
+        get { preference("sg.mod.keepViewOnce", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.keepViewOnce") }
+    }
+}"""
+
+KEEP_ONCE_HELPER_ANCHOR = """private typealias SignalKitTimer = SwiftSignalKit.Timer
+
+private final class ManagedAutoremoveMessageOperationsHelper {"""
+
+KEEP_ONCE_HELPER = """private typealias SignalKitTimer = SwiftSignalKit.Timer
+
+/// tearsgram: the toggle lives in the Swiftgram settings module, which sits
+/// above TelegramCore in the build graph, so read the raw defaults key here.
+func sgKeepViewOnceMediaEnabled() -> Bool {
+    let defaults = UserDefaults.standard
+    if defaults.object(forKey: "sg.mod.keepViewOnce") == nil {
+        return true
+    }
+    return defaults.bool(forKey: "sg.mod.keepViewOnce")
+}
+
+private final class ManagedAutoremoveMessageOperationsHelper {"""
+
+KEEP_ONCE_EXPIRY_OLD = """                        } else {
+                            transaction.updateMessage(message.id, update: { currentMessage in
+                                var storeForwardInfo: StoreMessageForwardInfo?"""
+
+KEEP_ONCE_EXPIRY_NEW = """                        } else if sgKeepViewOnceMediaEnabled(), message.flags.contains(.Incoming), message.containsSecretMedia, let autoclear = message.autoclearAttribute, autoclear.timeout == viewOnceTimeout {
+                            // tearsgram: a one-time photo or video has just been
+                            // viewed. Drop the one-time attributes and keep the
+                            // media, so the message turns into an ordinary
+                            // attachment instead of an expired placeholder.
+                            transaction.updateMessage(message.id, update: { currentMessage in
+                                var storeForwardInfo: StoreMessageForwardInfo?
+                                if let forwardInfo = currentMessage.forwardInfo {
+                                    storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+                                }
+                                var updatedAttributes = currentMessage.attributes
+                                updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
+                                updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
+                                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media))
+                            })
+                            transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
+                        } else {
+                            transaction.updateMessage(message.id, update: { currentMessage in
+                                var storeForwardInfo: StoreMessageForwardInfo?"""
+
+KEEP_ONCE_REMOTE_OLD = """                    if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
+                    } else {
+                        for i in 0 ..< updatedMedia.count {
+                            if attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout) {"""
+
+KEEP_ONCE_REMOTE_NEW = """                    if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
+                    } else {
+                        let keepViewOnce = sgKeepViewOnceMediaEnabled() && attribute.timeout == viewOnceTimeout
+                        for i in 0 ..< updatedMedia.count {
+                            if !keepViewOnce, attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout) {"""
+
 BG_TASK_OLD = """	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>
@@ -404,6 +473,10 @@ def patch_local_notification_settings(repo: Path) -> bool:
     old_label = 'String(format: "%02d:00 \u2013 %02d:00"'
     if old_label in text:
         text = text.replace(old_label, 'String(format: "%02d:00 - %02d:00"', 1)
+        changed = True
+    if "sg.mod.keepViewOnce" not in text:
+        require(KEEP_VIEW_ONCE_SETTINGS_OLD in text, f"{path}: quietHoursLabel block not found")
+        text = text.replace(KEEP_VIEW_ONCE_SETTINGS_OLD, KEEP_VIEW_ONCE_SETTINGS_NEW, 1)
         changed = True
     if changed:
         write(path, text)
@@ -598,6 +671,111 @@ def patch_quiet_hours_ui(repo: Path) -> bool:
     return False
 
 
+def patch_view_once_media(repo: Path) -> bool:
+    """Keep one-time photos and videos after they have been opened.
+
+    Telegram marks such a message as consumed and immediately replaces the
+    media with `TelegramMediaExpiredContent`. Skipping that replacement and
+    dropping the one-time attributes turns the message into an ordinary
+    attachment that can be opened again.
+    """
+    changed = False
+
+    path = repo / "submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift"
+    text = read(path)
+    original = text
+    if "sgKeepViewOnceMediaEnabled" not in text:
+        require(KEEP_ONCE_HELPER_ANCHOR in text, f"{path}: helper anchor not found")
+        text = text.replace(KEEP_ONCE_HELPER_ANCHOR, KEEP_ONCE_HELPER, 1)
+    text = replace_once(
+        text,
+        KEEP_ONCE_EXPIRY_OLD,
+        KEEP_ONCE_EXPIRY_NEW,
+        path,
+        "keep consumed one-time media",
+        marker="sgKeepViewOnceMediaEnabled(), message.flags.contains(.Incoming)",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        KEEP_ONCE_REMOTE_OLD,
+        KEEP_ONCE_REMOTE_NEW,
+        path,
+        "keep remotely consumed one-time media",
+        marker="let keepViewOnce = sgKeepViewOnceMediaEnabled()",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        "    case localNotifications, backgroundKeepAlive\n}",
+        "    case localNotifications, backgroundKeepAlive\n    case keepViewOnce\n}",
+        path,
+        "SGModToggle.keepViewOnce",
+        marker="case keepViewOnce\n}",
+    )
+    text = replace_once(
+        text,
+        "        case .deleted:\n"
+        "            SGPrivacySettings.keepDeletedMessages = value\n"
+        "            if !value {\n"
+        "                // Remove only locally retained, server-deleted rows from this account.\n"
+        "                let _ = sgRemoveRetainedMessages(postbox: context.account.postbox).start()\n"
+        "            }\n",
+        "        case .deleted:\n"
+        "            SGPrivacySettings.keepDeletedMessages = value\n"
+        "            if !value {\n"
+        "                // Remove only locally retained, server-deleted rows from this account.\n"
+        "                let _ = sgRemoveRetainedMessages(postbox: context.account.postbox).start()\n"
+        "            }\n"
+        "        case .keepViewOnce:\n"
+        "            SGPrivacySettings.keepViewOnceMedia = value\n",
+        path,
+        "keep once toggle handler",
+        marker="case .keepViewOnce:",
+    )
+    anchor = (
+        '        entries.append(.header(id: counter.count, section: .notifications, '
+        'text: ru ? "Уведомления" : "Notifications", badge: nil))'
+    )
+    addition = (
+        "        entries.append(.toggle(id: counter.count, section: .deleted, settingName: .keepViewOnce, "
+        'value: SGPrivacySettings.keepViewOnceMedia, text: ru ? "Одноразовые фото и видео" : "Keep one-time photos and videos", enabled: true))\n'
+        "        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "
+        '"После просмотра одноразовое фото или видео остаётся в чате как обычное вложение: его можно открыть снова, '
+        "переслать или сохранить. Отметка о просмотре всё равно уходит отправителю. Работает для входящих в облачных "
+        'чатах; секретные чаты не затрагиваются." '
+        ': "After viewing, a one-time photo or video stays in the chat as an ordinary attachment: it can be opened '
+        "again, forwarded or saved. The read receipt is still sent to the sender. Works for incoming media in cloud "
+        'chats; secret chats are not affected."))\n'
+        + anchor
+    )
+    text = replace_once(
+        text,
+        anchor,
+        addition,
+        path,
+        "keep once rows",
+        marker="section: .deleted, settingName: .keepViewOnce",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    return changed
+
+
 def patch_local_notifications(repo: Path) -> bool:
     path = repo / "submodules/TelegramUI/Sources/AppDelegate.swift"
     text = read(path)
@@ -781,6 +959,9 @@ def verify(repo: Path) -> list[str]:
             ('settingName: "quietHours"', 1),
             ('actionType: "testNotification"', 1),
             ("import UserNotifications", 1),
+            ("section: .deleted, settingName: .keepViewOnce", 1),
+            ("case keepViewOnce\n}", 1),
+            ("case .keepViewOnce:", 1),
         ):
             actual = text.count(token)
             if actual != expected:
@@ -818,6 +999,23 @@ def verify(repo: Path) -> list[str]:
             if token not in text:
                 problems.append(f"SGLocalNotifications.swift: {token} is missing")
 
+    autoremove = repo / "submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift"
+    if not autoremove.is_file():
+        problems.append("ManagedAutoremoveMessageOperations.swift is missing from TelegramCore")
+    else:
+        text = read(autoremove)
+        for token in (
+            "func sgKeepViewOnceMediaEnabled()",
+            "sgKeepViewOnceMediaEnabled(), message.flags.contains(.Incoming)",
+            "updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })",
+        ):
+            if token not in text:
+                problems.append(f"ManagedAutoremoveMessageOperations.swift: {token} is missing")
+
+    consumed = repo / "submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift"
+    if consumed.is_file() and "let keepViewOnce = sgKeepViewOnceMediaEnabled()" not in read(consumed):
+        problems.append("MarkMessageContentAsConsumedInteractively.swift: remote consumption is not guarded")
+
     privacy_settings = repo / "Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift"
     if privacy_settings.is_file():
         text = read(privacy_settings)
@@ -826,6 +1024,7 @@ def verify(repo: Path) -> list[str]:
             ("sg.mod.localNotifications", "public static var localNotifications: Bool"),
             ("sg.mod.backgroundKeepAlive", "public static var backgroundKeepAlive: Bool"),
             ("sg.mod.quietHours", "public static var quietHours: String"),
+            ("sg.mod.keepViewOnce", "public static var keepViewOnceMedia: Bool"),
         ):
             if text.count(key) != 2:
                 problems.append(f"SGPrivacySettings.swift: {key!r} appears {text.count(key)} times, expected 2")
@@ -928,6 +1127,7 @@ def main() -> int:
         notification_settings_changed = patch_local_notification_settings(repo)
         notification_ui_changed = patch_notification_settings(repo)
         quiet_hours_changed = patch_quiet_hours_ui(repo)
+        view_once_changed = patch_view_once_media(repo)
         local_notifications_changed = patch_local_notifications(repo)
         background_tasks_changed = patch_background_tasks(repo)
         renamed = brand_rename(repo)
@@ -946,6 +1146,7 @@ def main() -> int:
     print("SGPrivacySettings.swift patched:", notification_settings_changed)
     print("notification settings rows patched:", notification_ui_changed)
     print("quiet hours rows patched:", quiet_hours_changed)
+    print("one-time media retention patched:", view_once_changed)
     print("AppDelegate.swift local notifications patched:", local_notifications_changed)
     print("background task identifiers patched:", background_tasks_changed)
     print("files rebranded:", len(renamed))

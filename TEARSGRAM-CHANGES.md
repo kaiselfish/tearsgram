@@ -131,3 +131,35 @@ bundle id нельзя. Итог: `registerForRemoteNotifications()` не даё
   (`UNTimeIntervalNotificationTrigger`), чтобы успеть свернуть приложение: в форграунде
   iOS баннер не показывает. Ничего не отправляет в сеть и не требует разрешений сверх уже
   выданных.
+
+## Одноразовые фото и видео
+
+`Настройки → Swiftgram → tearsgram` → `Одноразовые фото и видео`
+(`sg.mod.keepViewOnce`, по умолчанию включено).
+
+Входящее одноразовое медиа хранится как обычное сообщение с `AutoclearTimeoutMessageAttribute`
+(`timeout == viewOnceTimeout`, то есть `0x7fffffff`) и `ConsumableContentMessageAttribute`.
+При открытии клиент ставит `consumed = true`, записывает `countdownBeginTime = сейчас` —
+и `managedAutoremoveMessageOperations(isRemove: false)` по тегу 1 срабатывает через ноль
+секунд, заменяя `TelegramMediaImage`/`TelegramMediaFile` на `TelegramMediaExpiredContent`
+и удаляя атрибут. Именно поэтому фото исчезает сразу после просмотра.
+
+С включённым переключателем ветка в `ManagedAutoremoveMessageOperations.swift` вместо
+замены медиа делает сообщение обычным вложением:
+
+- `AutoclearTimeoutMessageAttribute` и `ConsumableContentMessageAttribute` удаляются,
+  `AutoremoveTimeoutMessageAttribute` (автоудаление чата) остаётся, поэтому TTL переписки
+  по-прежнему работает;
+- медиа не заменяется, таймер снимается через `clearTimestampBasedAttribute`;
+- `containsSecretMedia` становится `false`, и пузырь рендерится как обычное фото или видео:
+  его можно открыть повторно, переслать и сохранить в галерею;
+- отметка о просмотре всё равно уходит отправителю (`markMessageContentAsConsumed`), у него
+  сообщение удаляется как обычно.
+
+Тот же флаг проверяется в `markMessageContentAsConsumedRemotely`: если одноразовое медиа
+израсходовано на другом устройстве, локальная копия не превращается в заглушку.
+
+Ограничения: работает для входящих сообщений в облачных чатах; секретные чаты не
+затрагиваются, потому что там сообщение удаляется целиком. Если сервер уже удалил файл,
+а приложение потеряло локальный кеш (переустановка, очистка данных), восстановить медиа
+неоткуда — сохраняется ровно то, что успело скачаться на устройство.

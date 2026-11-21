@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "pastavibeEmojiStatusFileId", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS", "localNotifications", "backgroundKeepAlive", "quietHours"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "pastavibeEmojiStatusFileId", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS", "localNotifications", "backgroundKeepAlive", "quietHours", "keepViewOnce"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -103,6 +103,13 @@ struct SGPrivacySettingsTests {
         SGPrivacySettings.quietHours = "23-8"
         precondition(SGPrivacySettings.quietHours == "23-8")
         precondition(SGPrivacySettings.quietHoursLabel(russian: false) == "23:00 - 08:00")
+        precondition(SGPrivacySettings.keepViewOnceMedia, "One-time photos and videos must be kept by default")
+        SGPrivacySettings.keepViewOnceMedia = false
+        precondition(!SGPrivacySettings.keepViewOnceMedia)
+        precondition(!defaults.bool(forKey: "sg.mod.keepViewOnce"))
+        SGPrivacySettings.keepViewOnceMedia = true
+        precondition(SGPrivacySettings.keepViewOnceMedia)
+        precondition(defaults.bool(forKey: "sg.mod.keepViewOnce"))
         for key in keys { defaults.removeObject(forKey: key) }
         defaults.set(true, forKey: "sg.mod.hideOnline")
         precondition(SGPrivacySettings.ghostMode, "Existing ghost mode must migrate")
