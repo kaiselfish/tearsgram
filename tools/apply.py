@@ -450,7 +450,9 @@ KEEP_ONCE_BODY_REPAIR_NEW = """                            transaction.updateMes
 KEEP_ONCE_RETAINED_HELPER_ANCHOR = """private final class ManagedAutoremoveMessageOperationsHelper {"""
 
 KEEP_ONCE_RETAINED_HELPER = """/// tearsgram: rebuilds a consumed one-time message as an ordinary attachment.
-func sgRetainedStoreMessage(_ currentMessage: StoreMessage) -> StoreMessage {
+/// The transaction hands over the read-only `Message`, so the helper rebuilds
+/// the `StoreMessage` from it, exactly like the upstream expiry code did.
+func sgRetainedStoreMessage(_ currentMessage: Message) -> StoreMessage {
     var storeForwardInfo: StoreMessageForwardInfo?
     if let forwardInfo = currentMessage.forwardInfo {
         storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
@@ -803,6 +805,14 @@ def patch_view_once_media(repo: Path) -> bool:
     if "sgRetainedStoreMessage" not in text:
         require(KEEP_ONCE_RETAINED_HELPER_ANCHOR in text, f"{path}: retained helper anchor not found")
         text = text.replace(KEEP_ONCE_RETAINED_HELPER_ANCHOR, KEEP_ONCE_RETAINED_HELPER, 1)
+    elif "func sgRetainedStoreMessage(_ currentMessage: StoreMessage)" in text:
+        # The first version of the helper took a `StoreMessage`, but the
+        # transaction closure hands over a read-only `Message`.
+        text = text.replace(
+            "func sgRetainedStoreMessage(_ currentMessage: StoreMessage) -> StoreMessage {",
+            "func sgRetainedStoreMessage(_ currentMessage: Message) -> StoreMessage {",
+            1,
+        )
     text = replace_once(
         text,
         KEEP_ONCE_EXPIRY_OLD,
