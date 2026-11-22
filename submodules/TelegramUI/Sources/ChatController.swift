@@ -1518,7 +1518,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 message: message,
                 mediaSubject: params.mediaSubject,
                 standalone: standalone,
-                copyProtected: self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled,
+                copyProtected: !SGPrivacySettings.ignoreCopyProtection && (self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled),
                 reverseMessageGalleryOrder: false,
                 mode: mode,
                 navigationController: self.effectiveNavigationController, dismissInput: { [weak self] in
@@ -3881,7 +3881,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     }
                 }
                 
-                if !canSendMessagesToChat(strongSelf.presentationInterfaceState) && (strongSelf.presentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {
+                if !SGPrivacySettings.ignoreCopyProtection && !canSendMessagesToChat(strongSelf.presentationInterfaceState) && (strongSelf.presentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {
                     return .none
                 }
                 

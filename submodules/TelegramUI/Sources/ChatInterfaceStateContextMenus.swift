@@ -370,7 +370,7 @@ func updatedChatEditInterfaceMessageState(context: AccountContext, state: ChatPr
 
 private func ephemeralReplacementContextMenuItems(chatPresentationInterfaceState: ChatPresentationInterfaceState, context: AccountContext, message: EngineRawMessage, controllerInteraction: ChatControllerInteraction, interfaceInteraction: ChatPanelInterfaceInteraction) -> Signal<ContextController.Items, NoError> {
     let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let isCopyProtected = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()
+    let isCopyProtected = !SGPrivacySettings.ignoreCopyProtection && (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected())
     let replacementMessage = message.activeEphemeralReplacementMessage
 
     var richMessageInstantPage: InstantPage?
@@ -815,7 +815,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         }
     }
     
-    if !canSendMessagesToChat(chatPresentationInterfaceState) && (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {
+    if !SGPrivacySettings.ignoreCopyProtection && !canSendMessagesToChat(chatPresentationInterfaceState) && (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {
         canReply = false
     }
     
@@ -1352,7 +1352,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        let isCopyProtected = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()
+        let isCopyProtected = !SGPrivacySettings.ignoreCopyProtection && (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected())
         if !messageText.isEmpty || richMessageMarkdown != nil || (resourceAvailable && isImage) || diceEmoji != nil {
             if !isExpired {
                 if !isPoll {
@@ -2688,6 +2688,9 @@ func chatAvailableMessageActionsImpl(engine: TelegramEngine, accountPeerId: Engi
         }
         
         func isPeerCopyProtected(_ peerId: EnginePeer.Id) -> Bool? {
+            if SGPrivacySettings.ignoreCopyProtection {
+                return nil
+            }
             let copyProtection = copyProtectionMap[peerId]
             let myCopyProtection = myCopyProtectionMap[peerId]
             if copyProtection == true || myCopyProtection == true {

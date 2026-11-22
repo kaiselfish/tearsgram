@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "pastavibeEmojiStatusFileId", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS", "localNotifications", "backgroundKeepAlive", "quietHours", "keepViewOnce"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "pastavibeEmojiStatusFileId", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS", "localNotifications", "backgroundKeepAlive", "quietHours", "keepViewOnce", "ignoreCopyProtection"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -110,6 +110,13 @@ struct SGPrivacySettingsTests {
         SGPrivacySettings.keepViewOnceMedia = true
         precondition(SGPrivacySettings.keepViewOnceMedia)
         precondition(defaults.bool(forKey: "sg.mod.keepViewOnce"))
+        precondition(SGPrivacySettings.ignoreCopyProtection, "Saving and forwarding protected media must work by default")
+        SGPrivacySettings.ignoreCopyProtection = false
+        precondition(!SGPrivacySettings.ignoreCopyProtection)
+        precondition(!defaults.bool(forKey: "sg.mod.ignoreCopyProtection"))
+        SGPrivacySettings.ignoreCopyProtection = true
+        precondition(SGPrivacySettings.ignoreCopyProtection)
+        precondition(defaults.bool(forKey: "sg.mod.ignoreCopyProtection"))
         for key in keys { defaults.removeObject(forKey: key) }
         defaults.set(true, forKey: "sg.mod.hideOnline")
         precondition(SGPrivacySettings.ghostMode, "Existing ghost mode must migrate")

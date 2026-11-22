@@ -109,6 +109,24 @@ public func chatMessageGalleryControllerData(
     actionInteraction: GalleryControllerActionInteraction?
 ) -> ChatMessageGalleryControllerData? {
     var standalone = standalone
+    if message.localTags.contains(.TearsgramKeptOnce) {
+        // tearsgram: a retained one-time photo was stored without the photo
+        // tags, so the chat media gallery cannot find it by its history tag.
+        // Open exactly this message instead of its nearest neighbour.
+        standalone = true
+    } else if message.flags.contains(.Incoming) && !message.tags.contains(.photoOrVideo) && !message.tags.contains(.voiceOrInstantVideo) && message.effectiveMedia.contains(where: { media in
+        // Rows kept by an older build have no local tag. Incoming photo or
+        // video media without the matching history tag cannot be found by the
+        // chat media gallery, so the same fallback applies to them.
+        if media is TelegramMediaImage {
+            return true
+        } else if let file = media as? TelegramMediaFile {
+            return file.isVideo && !file.isInstantVideo && !file.isAnimated
+        }
+        return false
+    }) {
+        standalone = true
+    }
     if message.id.peerId.namespace == Namespaces.Peer.CloudUser && message.id.namespace != Namespaces.Message.Cloud {
         standalone = true
     }

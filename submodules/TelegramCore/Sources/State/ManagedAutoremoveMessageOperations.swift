@@ -16,6 +16,28 @@ func sgKeepViewOnceMediaEnabled() -> Bool {
     return defaults.bool(forKey: "sg.mod.keepViewOnce")
 }
 
+/// tearsgram: rebuilds a consumed one-time message as an ordinary attachment.
+func sgRetainedStoreMessage(_ currentMessage: StoreMessage) -> StoreMessage {
+    var storeForwardInfo: StoreMessageForwardInfo?
+    if let forwardInfo = currentMessage.forwardInfo {
+        storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+    }
+    var updatedTags = currentMessage.tags
+    for attachment in currentMessage.media {
+        if attachment is TelegramMediaImage {
+            updatedTags.insert(.photoOrVideo)
+            updatedTags.insert(.photo)
+        } else if let file = attachment as? TelegramMediaFile, file.isVideo, !file.isInstantVideo {
+            updatedTags.insert(.photoOrVideo)
+            updatedTags.insert(.video)
+        }
+    }
+    var updatedAttributes = currentMessage.attributes
+    updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
+    updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
+    return StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: updatedTags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags.union(.TearsgramKeptOnce), forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media)
+}
+
 private final class ManagedAutoremoveMessageOperationsHelper {
     var entry: (TimestampBasedMessageAttributesEntry, MetaDisposable)?
     
@@ -104,14 +126,7 @@ func managedAutoremoveMessageOperations(network: Network, postbox: Postbox, isRe
                             // media, so the message turns into an ordinary
                             // attachment instead of an expired placeholder.
                             transaction.updateMessage(message.id, update: { currentMessage in
-                                var storeForwardInfo: StoreMessageForwardInfo?
-                                if let forwardInfo = currentMessage.forwardInfo {
-                                    storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
-                                }
-                                var updatedAttributes = currentMessage.attributes
-                                updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
-                                updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
-                                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media))
+                                return .update(sgRetainedStoreMessage(currentMessage))
                             })
                             transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
                         } else {

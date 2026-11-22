@@ -419,6 +419,16 @@ KEEP_ONCE_EXPIRY_NEW = """                        } else if sgKeepViewOnceMediaE
                             // media, so the message turns into an ordinary
                             // attachment instead of an expired placeholder.
                             transaction.updateMessage(message.id, update: { currentMessage in
+                                return .update(sgRetainedStoreMessage(currentMessage))
+                            })
+                            transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
+                        } else {
+                            transaction.updateMessage(message.id, update: { currentMessage in
+                                var storeForwardInfo: StoreMessageForwardInfo?"""
+
+# The first shipped version inlined the whole StoreMessage rebuild. Repair a
+# clone that still carries that body so the newer helper is used everywhere.
+KEEP_ONCE_BODY_REPAIR_OLD = """                            transaction.updateMessage(message.id, update: { currentMessage in
                                 var storeForwardInfo: StoreMessageForwardInfo?
                                 if let forwardInfo = currentMessage.forwardInfo {
                                     storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
@@ -427,11 +437,114 @@ KEEP_ONCE_EXPIRY_NEW = """                        } else if sgKeepViewOnceMediaE
                                 updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
                                 updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
                                 return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media))
-                            })
-                            transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
-                        } else {
-                            transaction.updateMessage(message.id, update: { currentMessage in
-                                var storeForwardInfo: StoreMessageForwardInfo?"""
+                            })"""
+
+KEEP_ONCE_BODY_REPAIR_NEW = """                            transaction.updateMessage(message.id, update: { currentMessage in
+                                return .update(sgRetainedStoreMessage(currentMessage))
+                            })"""
+
+# View-once media is stored without the photo/video tags, because secret media
+# is hidden from shared media. Once the one-time attributes are gone the message
+# has to become a regular attachment: re-add the tags and remember the row with
+# a local tag so the gallery opens exactly this message.
+KEEP_ONCE_RETAINED_HELPER_ANCHOR = """private final class ManagedAutoremoveMessageOperationsHelper {"""
+
+KEEP_ONCE_RETAINED_HELPER = """/// tearsgram: rebuilds a consumed one-time message as an ordinary attachment.
+func sgRetainedStoreMessage(_ currentMessage: StoreMessage) -> StoreMessage {
+    var storeForwardInfo: StoreMessageForwardInfo?
+    if let forwardInfo = currentMessage.forwardInfo {
+        storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+    }
+    var updatedTags = currentMessage.tags
+    for attachment in currentMessage.media {
+        if attachment is TelegramMediaImage {
+            updatedTags.insert(.photoOrVideo)
+            updatedTags.insert(.photo)
+        } else if let file = attachment as? TelegramMediaFile, file.isVideo, !file.isInstantVideo {
+            updatedTags.insert(.photoOrVideo)
+            updatedTags.insert(.video)
+        }
+    }
+    var updatedAttributes = currentMessage.attributes
+    updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
+    updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
+    return StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: updatedTags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags.union(.TearsgramKeptOnce), forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media)
+}
+
+private final class ManagedAutoremoveMessageOperationsHelper {"""
+
+KEPT_ONCE_TAG_OLD = """public extension LocalMessageTags {
+    static let OutgoingLiveLocation = LocalMessageTags(rawValue: 1 << 0)
+    static let OutgoingDeliveredToServer = LocalMessageTags(rawValue: 1 << 1)
+}"""
+
+KEPT_ONCE_TAG_NEW = """public extension LocalMessageTags {
+    static let OutgoingLiveLocation = LocalMessageTags(rawValue: 1 << 0)
+    static let OutgoingDeliveredToServer = LocalMessageTags(rawValue: 1 << 1)
+    /// tearsgram: a one-time photo or video that is now an ordinary attachment.
+    static let TearsgramKeptOnce = LocalMessageTags(rawValue: 1 << 2)
+}"""
+
+GALLERY_KEPT_STANDALONE_OLD = """    var standalone = standalone
+    if message.id.peerId.namespace == Namespaces.Peer.CloudUser && message.id.namespace != Namespaces.Message.Cloud {
+        standalone = true
+    }"""
+
+GALLERY_KEPT_STANDALONE_NEW = """    var standalone = standalone
+    if message.localTags.contains(.TearsgramKeptOnce) {
+        // tearsgram: a retained one-time photo was stored without the photo
+        // tags, so the chat media gallery cannot find it by its history tag.
+        // Open exactly this message instead of its nearest neighbour.
+        standalone = true
+    } else if message.flags.contains(.Incoming) && !message.tags.contains(.photoOrVideo) && !message.tags.contains(.voiceOrInstantVideo) && message.effectiveMedia.contains(where: { media in
+        // Rows kept by an older build have no local tag. Incoming photo or
+        // video media without the matching history tag cannot be found by the
+        // chat media gallery, so the same fallback applies to them.
+        if media is TelegramMediaImage {
+            return true
+        } else if let file = media as? TelegramMediaFile {
+            return file.isVideo && !file.isInstantVideo && !file.isAnimated
+        }
+        return false
+    }) {
+        standalone = true
+    }
+    if message.id.peerId.namespace == Namespaces.Peer.CloudUser && message.id.namespace != Namespaces.Message.Cloud {
+        standalone = true
+    }"""
+
+GALLERY_KEPT_STANDALONE_SHORT = """    var standalone = standalone
+    if message.localTags.contains(.TearsgramKeptOnce) {
+        // tearsgram: a retained one-time photo was stored without the photo
+        // tags, so the chat media gallery cannot find it by its history tag.
+        // Open exactly this message instead of its nearest neighbour.
+        standalone = true
+    }
+    if message.id.peerId.namespace == Namespaces.Peer.CloudUser && message.id.namespace != Namespaces.Message.Cloud {
+        standalone = true
+    }"""
+
+COPY_PROTECTION_SETTINGS_OLD = """    public static var keepViewOnceMedia: Bool {
+        get { preference("sg.mod.keepViewOnce", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.keepViewOnce") }
+    }
+}"""
+
+COPY_PROTECTION_SETTINGS_NEW = """    public static var keepViewOnceMedia: Bool {
+        get { preference("sg.mod.keepViewOnce", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.keepViewOnce") }
+    }
+
+    /// Clients hide "save" and "forward" for chats whose owner enabled content
+    /// protection. Telegram marks such messages with the no-forwards flag or
+    /// the peer with the copy-protection flag. This switch ignores that
+    /// client-side restriction; saving is local, forwarding also depends on
+    /// the server if the channel enforces the ban on its side.
+    public static var ignoreCopyProtection: Bool {
+        get { preference("sg.mod.ignoreCopyProtection", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.ignoreCopyProtection") }
+    }
+}"""
 
 KEEP_ONCE_REMOTE_OLD = """                    if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
                     } else {
@@ -504,7 +617,7 @@ def patch_notification_settings(repo: Path) -> bool:
         "    case localNotifications, backgroundKeepAlive\n}",
         path,
         "SGModToggle.localNotifications",
-        marker="case localNotifications, backgroundKeepAlive\n}",
+        marker="case localNotifications, backgroundKeepAlive",
     )
 
     text = replace_once(
@@ -687,6 +800,9 @@ def patch_view_once_media(repo: Path) -> bool:
     if "sgKeepViewOnceMediaEnabled" not in text:
         require(KEEP_ONCE_HELPER_ANCHOR in text, f"{path}: helper anchor not found")
         text = text.replace(KEEP_ONCE_HELPER_ANCHOR, KEEP_ONCE_HELPER, 1)
+    if "sgRetainedStoreMessage" not in text:
+        require(KEEP_ONCE_RETAINED_HELPER_ANCHOR in text, f"{path}: retained helper anchor not found")
+        text = text.replace(KEEP_ONCE_RETAINED_HELPER_ANCHOR, KEEP_ONCE_RETAINED_HELPER, 1)
     text = replace_once(
         text,
         KEEP_ONCE_EXPIRY_OLD,
@@ -694,6 +810,52 @@ def patch_view_once_media(repo: Path) -> bool:
         path,
         "keep consumed one-time media",
         marker="sgKeepViewOnceMediaEnabled(), message.flags.contains(.Incoming)",
+    )
+    text = replace_once(
+        text,
+        KEEP_ONCE_BODY_REPAIR_OLD,
+        KEEP_ONCE_BODY_REPAIR_NEW,
+        path,
+        "keep once helper call",
+        marker="return .update(sgRetainedStoreMessage(currentMessage))",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/TelegramCore/Sources/SyncCore/SyncCore_Namespaces.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        KEPT_ONCE_TAG_OLD,
+        KEPT_ONCE_TAG_NEW,
+        path,
+        "kept one-time local tag",
+        marker="static let TearsgramKeptOnce",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/GalleryData/Sources/GalleryData.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        GALLERY_KEPT_STANDALONE_OLD,
+        GALLERY_KEPT_STANDALONE_NEW,
+        path,
+        "gallery standalone for retained one-time media",
+        marker="message.localTags.contains(.TearsgramKeptOnce)",
+    )
+    text = replace_once(
+        text,
+        GALLERY_KEPT_STANDALONE_SHORT,
+        GALLERY_KEPT_STANDALONE_NEW,
+        path,
+        "gallery legacy standalone fallback",
+        marker="Rows kept by an older build",
     )
     if text != original:
         write(path, text)
@@ -723,7 +885,7 @@ def patch_view_once_media(repo: Path) -> bool:
         "    case localNotifications, backgroundKeepAlive\n    case keepViewOnce\n}",
         path,
         "SGModToggle.keepViewOnce",
-        marker="case keepViewOnce\n}",
+        marker="case keepViewOnce",
     )
     text = replace_once(
         text,
@@ -769,6 +931,211 @@ def patch_view_once_media(repo: Path) -> bool:
         "keep once rows",
         marker="section: .deleted, settingName: .keepViewOnce",
     )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    return changed
+
+
+def patch_copy_protection(repo: Path) -> bool:
+    """Ignore the client-side "no copy / no forward" restriction.
+
+    Telegram asks clients to hide saving and forwarding for chats that enable
+    content protection: the message carries a no-forwards flag or its peer has
+    the copy-protection flag. The setting below makes those checks accept the
+    message. Saving happens locally; forwarding still depends on the server if
+    the channel also enforces the restriction on its side.
+    """
+    changed = False
+
+    path = repo / "Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        COPY_PROTECTION_SETTINGS_OLD,
+        COPY_PROTECTION_SETTINGS_NEW,
+        path,
+        "ignore copy protection setting",
+        marker="sg.mod.ignoreCopyProtection",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        "    case keepViewOnce\n}",
+        "    case keepViewOnce\n    case ignoreCopyProtection\n}",
+        path,
+        "SGModToggle.ignoreCopyProtection",
+        marker="case ignoreCopyProtection\n}",
+    )
+    text = replace_once(
+        text,
+        "        case .keepViewOnce:\n"
+        "            SGPrivacySettings.keepViewOnceMedia = value\n",
+        "        case .keepViewOnce:\n"
+        "            SGPrivacySettings.keepViewOnceMedia = value\n"
+        "        case .ignoreCopyProtection:\n"
+        "            SGPrivacySettings.ignoreCopyProtection = value\n",
+        path,
+        "ignore copy protection toggle handler",
+        marker="case .ignoreCopyProtection:",
+    )
+    privacy_anchor = (
+        '        entries.append(.toggle(id: counter.count, section: .privacy, settingName: .interactions, '
+        'value: SGPrivacySettings.ghostHideInteractions, text: ru ? "Скрывать выбор стикеров и другие индикаторы" '
+        ': "Hide sticker and interaction indicators", enabled: true))'
+    )
+    privacy_rows = (
+        privacy_anchor
+        + "\n"
+        '        entries.append(.toggle(id: counter.count, section: .privacy, settingName: .ignoreCopyProtection, '
+        'value: SGPrivacySettings.ignoreCopyProtection, text: ru ? "Сохранять и пересылать защищённые медиа" '
+        ': "Save and forward protected media", enabled: true))\n'
+        '        entries.append(.notice(id: counter.count, section: .privacy, text: ru ? '
+        '"Игнорирует запрет копирования, который автор чата или канала включил для своих сообщений: медиа из таких '
+        "чатов можно открывать, сохранять в галерею и пересылать. Сохранение выполняется на устройстве и работает "
+        "всегда. Пересылка зависит ещё и от сервера: если канал запрещает пересылку на своей стороне, сервер может "
+        'отклонить её." : "Ignores the copy ban that a chat or channel owner sets for their messages: media from '
+        "such chats can be opened, saved to the photo library and forwarded. Saving happens on the device and always "
+        "works. Forwarding also depends on the server: if the channel enforces the ban on its side, the server may "
+        'reject it."))\n'
+    )
+    text = replace_once(
+        text,
+        privacy_anchor,
+        privacy_rows,
+        path,
+        "ignore copy protection row",
+        marker="settingName: .ignoreCopyProtection",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/TelegramCore/Sources/Utils/MessageUtils.swift"
+    text = read(path)
+    original = text
+    if "import SGSimpleSettings" not in text:
+        require("import Foundation\nimport Postbox\n" in text, f"{path}: import anchor not found")
+        text = text.replace(
+            "import Foundation\nimport Postbox\n",
+            "import Foundation\nimport Postbox\nimport SGSimpleSettings\n",
+            1,
+        )
+    text = replace_once(
+        text,
+        "    func isCopyProtected() -> Bool {\n        if self.flags.contains(.CopyProtected) {",
+        "    func isCopyProtected() -> Bool {\n"
+        "        if SGPrivacySettings.ignoreCopyProtection {\n"
+        "            return false\n"
+        "        }\n"
+        "        if self.flags.contains(.CopyProtected) {",
+        path,
+        "ignore copy protection in isCopyProtected",
+        marker="if SGPrivacySettings.ignoreCopyProtection {\n            return false\n        }\n        if self.flags.contains(.CopyProtected)",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift"
+    text = read(path)
+    original = text
+    old_ephemeral = "    let isCopyProtected = chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()"
+    new_ephemeral = "    let isCopyProtected = !SGPrivacySettings.ignoreCopyProtection && (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected())"
+    if old_ephemeral in text:
+        actual = text.count(old_ephemeral)
+        require(actual == 2, f"{path}: ephemeral copy protection anchor matched {actual} times, expected 2")
+        text = text.replace(old_ephemeral, new_ephemeral)
+    elif new_ephemeral not in text:
+        raise PatchError(f"{path}: ephemeral copy protection anchor not found")
+    text = replace_once(
+        text,
+        "    if !canSendMessagesToChat(chatPresentationInterfaceState) && (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {\n        canReply = false\n    }",
+        "    if !SGPrivacySettings.ignoreCopyProtection && !canSendMessagesToChat(chatPresentationInterfaceState) && (chatPresentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {\n        canReply = false\n    }",
+        path,
+        "copy protection reply gate",
+        marker="if !SGPrivacySettings.ignoreCopyProtection && !canSendMessagesToChat(chatPresentationInterfaceState)",
+    )
+    text = replace_once(
+        text,
+        "        func isPeerCopyProtected(_ peerId: EnginePeer.Id) -> Bool? {\n            let copyProtection = copyProtectionMap[peerId]",
+        "        func isPeerCopyProtected(_ peerId: EnginePeer.Id) -> Bool? {\n"
+        "            if SGPrivacySettings.ignoreCopyProtection {\n"
+        "                return nil\n"
+        "            }\n"
+        "            let copyProtection = copyProtectionMap[peerId]",
+        path,
+        "peer copy protection",
+        marker="func isPeerCopyProtected(_ peerId: EnginePeer.Id) -> Bool? {\n            if SGPrivacySettings.ignoreCopyProtection",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/TelegramUI/Sources/OpenChatMessage.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        "                        let canShare = !params.message.isCopyProtected() && !params.copyProtected",
+        "                        let canShare = SGPrivacySettings.ignoreCopyProtection || (!params.message.isCopyProtected() && !params.copyProtected)",
+        path,
+        "document sharing",
+        marker="let canShare = SGPrivacySettings.ignoreCopyProtection ||",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/TelegramUI/Sources/ChatController.swift"
+    text = read(path)
+    original = text
+    text = replace_once(
+        text,
+        "                copyProtected: self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled,",
+        "                copyProtected: !SGPrivacySettings.ignoreCopyProtection && (self.presentationInterfaceState.copyProtectionEnabled || self.presentationInterfaceState.myCopyProtectionEnabled),",
+        path,
+        "gallery copy protection",
+        marker="copyProtected: !SGPrivacySettings.ignoreCopyProtection && (self.presentationInterfaceState.copyProtectionEnabled",
+    )
+    text = replace_once(
+        text,
+        "                if !canSendMessagesToChat(strongSelf.presentationInterfaceState) && (strongSelf.presentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {\n                    return .none\n                }",
+        "                if !SGPrivacySettings.ignoreCopyProtection && !canSendMessagesToChat(strongSelf.presentationInterfaceState) && (strongSelf.presentationInterfaceState.copyProtectionEnabled || message.isCopyProtected()) {\n                    return .none\n                }",
+        path,
+        "chat reply gate",
+        marker="if !SGPrivacySettings.ignoreCopyProtection && !canSendMessagesToChat(strongSelf.presentationInterfaceState)",
+    )
+    if text != original:
+        write(path, text)
+        changed = True
+
+    path = repo / "submodules/GalleryUI/Sources/GalleryController.swift"
+    text = read(path)
+    original = text
+    if "import SGSimpleSettings" not in text:
+        require("import Foundation\nimport UIKit\n" in text, f"{path}: import anchor not found")
+        text = text.replace(
+            "import Foundation\nimport UIKit\n",
+            "import Foundation\nimport UIKit\nimport SGSimpleSettings\n",
+            1,
+        )
+    old_view = "let mapped = GalleryMessageHistoryView.view(view, peerIsCopyProtected)"
+    new_view = "let mapped = GalleryMessageHistoryView.view(view, peerIsCopyProtected && !SGPrivacySettings.ignoreCopyProtection)"
+    if old_view in text:
+        actual = text.count(old_view)
+        require(actual == 2, f"{path}: gallery view anchor matched {actual} times, expected 2")
+        text = text.replace(old_view, new_view)
+    elif new_view not in text:
+        raise PatchError(f"{path}: gallery view anchor not found")
     if text != original:
         write(path, text)
         changed = True
@@ -960,8 +1327,11 @@ def verify(repo: Path) -> list[str]:
             ('actionType: "testNotification"', 1),
             ("import UserNotifications", 1),
             ("section: .deleted, settingName: .keepViewOnce", 1),
-            ("case keepViewOnce\n}", 1),
+            ("case keepViewOnce", 1),
             ("case .keepViewOnce:", 1),
+            ("section: .privacy, settingName: .ignoreCopyProtection", 1),
+            ("case ignoreCopyProtection\n}", 1),
+            ("case .ignoreCopyProtection:", 1),
         ):
             actual = text.count(token)
             if actual != expected:
@@ -1008,9 +1378,48 @@ def verify(repo: Path) -> list[str]:
             "func sgKeepViewOnceMediaEnabled()",
             "sgKeepViewOnceMediaEnabled(), message.flags.contains(.Incoming)",
             "updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })",
+            "func sgRetainedStoreMessage(",
+            "return .update(sgRetainedStoreMessage(currentMessage))",
+            "localTags: currentMessage.localTags.union(.TearsgramKeptOnce)",
         ):
             if token not in text:
                 problems.append(f"ManagedAutoremoveMessageOperations.swift: {token} is missing")
+
+    namespaces = repo / "submodules/TelegramCore/Sources/SyncCore/SyncCore_Namespaces.swift"
+    if namespaces.is_file() and "static let TearsgramKeptOnce" not in read(namespaces):
+        problems.append("SyncCore_Namespaces.swift: TearsgramKeptOnce local tag is missing")
+
+    gallery = repo / "submodules/GalleryData/Sources/GalleryData.swift"
+    if gallery.is_file() and "message.localTags.contains(.TearsgramKeptOnce)" not in read(gallery):
+        problems.append("GalleryData.swift: retained one-time media is not opened standalone")
+
+    message_utils = repo / "submodules/TelegramCore/Sources/Utils/MessageUtils.swift"
+    if message_utils.is_file():
+        text = read(message_utils)
+        if "if SGPrivacySettings.ignoreCopyProtection {" not in text:
+            problems.append("MessageUtils.swift: isCopyProtected does not honour the bypass")
+
+    context_menus = repo / "submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift"
+    if context_menus.is_file():
+        text = read(context_menus)
+        for token in (
+            "let isCopyProtected = !SGPrivacySettings.ignoreCopyProtection &&",
+            "if SGPrivacySettings.ignoreCopyProtection {\n                return nil\n            }",
+        ):
+            if token not in text:
+                problems.append(f"ChatInterfaceStateContextMenus.swift: {token} is missing")
+
+    open_message = repo / "submodules/TelegramUI/Sources/OpenChatMessage.swift"
+    if open_message.is_file() and "let canShare = SGPrivacySettings.ignoreCopyProtection ||" not in read(open_message):
+        problems.append("OpenChatMessage.swift: document sharing does not honour the bypass")
+
+    chat_controller = repo / "submodules/TelegramUI/Sources/ChatController.swift"
+    if chat_controller.is_file() and "copyProtected: !SGPrivacySettings.ignoreCopyProtection &&" not in read(chat_controller):
+        problems.append("ChatController.swift: gallery copy protection does not honour the bypass")
+
+    gallery_ui = repo / "submodules/GalleryUI/Sources/GalleryController.swift"
+    if gallery_ui.is_file() and read(gallery_ui).count("peerIsCopyProtected && !SGPrivacySettings.ignoreCopyProtection") != 2:
+        problems.append("GalleryController.swift: peer copy protection does not honour the bypass")
 
     consumed = repo / "submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkMessageContentAsConsumedInteractively.swift"
     if consumed.is_file() and "let keepViewOnce = sgKeepViewOnceMediaEnabled()" not in read(consumed):
@@ -1025,6 +1434,7 @@ def verify(repo: Path) -> list[str]:
             ("sg.mod.backgroundKeepAlive", "public static var backgroundKeepAlive: Bool"),
             ("sg.mod.quietHours", "public static var quietHours: String"),
             ("sg.mod.keepViewOnce", "public static var keepViewOnceMedia: Bool"),
+            ("sg.mod.ignoreCopyProtection", "public static var ignoreCopyProtection: Bool"),
         ):
             if text.count(key) != 2:
                 problems.append(f"SGPrivacySettings.swift: {key!r} appears {text.count(key)} times, expected 2")
@@ -1128,6 +1538,7 @@ def main() -> int:
         notification_ui_changed = patch_notification_settings(repo)
         quiet_hours_changed = patch_quiet_hours_ui(repo)
         view_once_changed = patch_view_once_media(repo)
+        copy_protection_changed = patch_copy_protection(repo)
         local_notifications_changed = patch_local_notifications(repo)
         background_tasks_changed = patch_background_tasks(repo)
         renamed = brand_rename(repo)
@@ -1147,6 +1558,7 @@ def main() -> int:
     print("notification settings rows patched:", notification_ui_changed)
     print("quiet hours rows patched:", quiet_hours_changed)
     print("one-time media retention patched:", view_once_changed)
+    print("copy protection bypass patched:", copy_protection_changed)
     print("AppDelegate.swift local notifications patched:", local_notifications_changed)
     print("background task identifiers patched:", background_tasks_changed)
     print("files rebranded:", len(renamed))

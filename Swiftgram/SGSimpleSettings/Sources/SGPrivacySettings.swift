@@ -189,4 +189,14 @@ public enum SGPrivacySettings {
         get { preference("sg.mod.keepViewOnce", defaultValue: true) }
         set { set(newValue, for: "sg.mod.keepViewOnce") }
     }
+
+    /// Clients hide "save" and "forward" for chats whose owner enabled content
+    /// protection. Telegram marks such messages with the no-forwards flag or
+    /// the peer with the copy-protection flag. This switch ignores that
+    /// client-side restriction; saving is local, forwarding also depends on
+    /// the server if the channel enforces the ban on its side.
+    public static var ignoreCopyProtection: Bool {
+        get { preference("sg.mod.ignoreCopyProtection", defaultValue: true) }
+        set { set(newValue, for: "sg.mod.ignoreCopyProtection") }
+    }
 }

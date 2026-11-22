@@ -217,6 +217,8 @@ public extension GlobalMessageTags {
 public extension LocalMessageTags {
     static let OutgoingLiveLocation = LocalMessageTags(rawValue: 1 << 0)
     static let OutgoingDeliveredToServer = LocalMessageTags(rawValue: 1 << 1)
+    /// tearsgram: a one-time photo or video that is now an ordinary attachment.
+    static let TearsgramKeptOnce = LocalMessageTags(rawValue: 1 << 2)
 }
 
 public extension PendingMessageActionType {

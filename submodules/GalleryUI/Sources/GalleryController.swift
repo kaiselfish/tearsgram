@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SGSimpleSettings
 import Display
 import QuickLook
 import Postbox
@@ -917,7 +918,7 @@ public class GalleryController: ViewController, StandalonePresentableController,
                         }
                         return context.account.postbox.aroundMessageHistoryViewForLocation(context.chatLocationInput(for: chatLocation, contextHolder: chatLocationContextHolder), anchor: .index(message.index), ignoreMessagesInTimestampRange: nil, ignoreMessageIds: Set(), count: 50, clipHoles: false, fixedCombinedReadStates: nil, topTaggedMessageIdNamespaces: [], tag: inputTag, appendMessagesFromTheSameGroup: false, namespaces: namespaces, orderStatistics: [.combinedLocation])
                         |> mapToSignal { (view, _, _) -> Signal<GalleryMessageHistoryView?, NoError> in
-                            let mapped = GalleryMessageHistoryView.view(view, peerIsCopyProtected)
+                            let mapped = GalleryMessageHistoryView.view(view, peerIsCopyProtected && !SGPrivacySettings.ignoreCopyProtection)
                             return .single(mapped)
                         }
                     } else {
@@ -1754,7 +1755,7 @@ public class GalleryController: ViewController, StandalonePresentableController,
                                 }
                                 let signal = strongSelf.context.account.postbox.aroundMessageHistoryViewForLocation(strongSelf.context.chatLocationInput(for: chatLocation, contextHolder: chatLocationContextHolder), anchor: .index(reloadAroundIndex), ignoreMessagesInTimestampRange: nil, ignoreMessageIds: Set(), count: 50, clipHoles: false, fixedCombinedReadStates: nil, topTaggedMessageIdNamespaces: [], tag: tag, appendMessagesFromTheSameGroup: false, namespaces: namespaces, orderStatistics: [.combinedLocation])
                                 |> mapToSignal { (view, _, _) -> Signal<GalleryMessageHistoryView?, NoError> in
-                                    let mapped = GalleryMessageHistoryView.view(view, peerIsCopyProtected)
+                                    let mapped = GalleryMessageHistoryView.view(view, peerIsCopyProtected && !SGPrivacySettings.ignoreCopyProtection)
                                     return .single(mapped)
                                 }
                                 |> take(1)

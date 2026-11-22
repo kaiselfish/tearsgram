@@ -24,6 +24,7 @@ private enum SGModToggle: Hashable {
     case pseudoPro, ghost, deleted, unlimitedArchive, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
     case localNotifications, backgroundKeepAlive
     case keepViewOnce
+    case ignoreCopyProtection
 }
 
 private enum SGModLink: Hashable {
@@ -83,6 +84,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             }
         case .keepViewOnce:
             SGPrivacySettings.keepViewOnceMedia = value
+        case .ignoreCopyProtection:
+            SGPrivacySettings.ignoreCopyProtection = value
         }
         changed.set(true)
     }, setOneFromManyValue: { setting in
@@ -197,6 +200,9 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .reads, value: SGPrivacySettings.ghostHideReadReceipts, text: ru ? "Скрывать прочтение сообщений" : "Hide message read receipts", enabled: true))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .stories, value: SGPrivacySettings.ghostHideStories, text: ru ? "Скрывать просмотр историй" : "Hide story views", enabled: true))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .interactions, value: SGPrivacySettings.ghostHideInteractions, text: ru ? "Скрывать выбор стикеров и другие индикаторы" : "Hide sticker and interaction indicators", enabled: true))
+        entries.append(.toggle(id: counter.count, section: .privacy, settingName: .ignoreCopyProtection, value: SGPrivacySettings.ignoreCopyProtection, text: ru ? "Сохранять и пересылать защищённые медиа" : "Save and forward protected media", enabled: true))
+        entries.append(.notice(id: counter.count, section: .privacy, text: ru ? "Игнорирует запрет копирования, который автор чата или канала включил для своих сообщений: медиа из таких чатов можно открывать, сохранять в галерею и пересылать. Сохранение выполняется на устройстве и работает всегда. Пересылка зависит ещё и от сервера: если канал запрещает пересылку на своей стороне, сервер может отклонить её." : "Ignores the copy ban that a chat or channel owner sets for their messages: media from such chats can be opened, saved to the photo library and forwarded. Saving happens on the device and always works. Forwarding also depends on the server: if the channel enforces the ban on its side, the server may reject it."))
+
         entries.append(.notice(id: counter.count, section: .privacy, text: ru ? "Выберите скрываемые индикаторы. Главный переключатель сохраняет этот выбор. Отправленное сообщение или файл остаётся видимым получателю; уже отправленные отметки отменить нельзя." : "Choose which activity indicators to hide. The master switch preserves your selections. Sent messages and files remain visible to the recipient; already sent receipts cannot be undone."))
         entries.append(.toggle(id: counter.count, section: .deleted, settingName: .deleted, value: SGPrivacySettings.keepDeletedMessages, text: ru ? "Удалённые сообщения" : "Deleted messages", enabled: true))
         entries.append(.toggle(id: counter.count, section: .deleted, settingName: .background, value: SGPrivacySettings.backgroundDeletedMessages, text: ru ? "Обрабатывать удалёнки в фоне" : "Process deletions in background", enabled: SGPrivacySettings.keepDeletedMessages))
