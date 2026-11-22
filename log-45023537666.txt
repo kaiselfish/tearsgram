@@ -1,0 +1,189 @@
+commit: 0237a35622a3bdcc568bfdf120cb73ac02477c80
+run: 45023537666
+
+logs: app-storage-tests.log, compile.log, ghost-tests.log, icon-prep.log, icons.log, parse.log, push-tests.log, strings.log, voice-tests.log
+
+=== app-storage-tests.log (1 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: shared container, no entitlement, directory creation, restart/data preservation, explicit storage error
+
+=== compile.log (5469 lines, 16 error-like) ===
+--- error lines ---
+      Assertion checking: ............ no
+404 |         var error: NSError?
+506 |         var error: NSError?
+ERROR: /Users/runner/work/tearsgram/tearsgram/submodules/TelegramCore/BUILD:23:14: Compiling Swift module //submodules/TelegramCore:TelegramCore failed: (Exit 1): worker failed: error executing SwiftCompile command (from swift_library rule target //submodules/TelegramCore:TelegramCore) 
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:23:74: error: value of type 'StoreMessageForwardInfo' has no member 'author'
+    |                                                                          `- error: value of type 'StoreMessageForwardInfo' has no member 'author'
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:23:108: error: value of type 'StoreMessageForwardInfo' has no member 'source'
+    |                                                                                                            `- error: value of type 'StoreMessageForwardInfo' has no member 'source'
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:38:258: error: missing argument label 'arrayLiteral:' in call
+    |                                                                                                                                                                                                                                                                  `- error: missing argument label 'arrayLiteral:' in call
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:38:458: error: value of type 'StoreMessage' has no member 'author'
+    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                          `- error: value of type 'StoreMessage' has no member 'author'
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:129:71: error: cannot convert value of type 'Message' to expected argument type 'StoreMessage'
+    |                                                                       `- error: cannot convert value of type 'Message' to expected argument type 'StoreMessage'
+ERROR: Build did NOT complete successfully
+Traceback (most recent call last):
+--- last 60 lines ---
+# Execution platform: @@platforms//host:host
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:23:74: error: value of type 'StoreMessageForwardInfo' has no member 'author'
+ 21 |     var storeForwardInfo: StoreMessageForwardInfo?
+ 22 |     if let forwardInfo = currentMessage.forwardInfo {
+ 23 |         storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+    |                                                                          `- error: value of type 'StoreMessageForwardInfo' has no member 'author'
+ 24 |     }
+ 25 |     var updatedTags = currentMessage.tags
+
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:23:108: error: value of type 'StoreMessageForwardInfo' has no member 'source'
+ 21 |     var storeForwardInfo: StoreMessageForwardInfo?
+ 22 |     if let forwardInfo = currentMessage.forwardInfo {
+ 23 |         storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+    |                                                                                                            `- error: value of type 'StoreMessageForwardInfo' has no member 'source'
+ 24 |     }
+ 25 |     var updatedTags = currentMessage.tags
+
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:38:258: error: missing argument label 'arrayLiteral:' in call
+ 36 |     updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
+ 37 |     updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
+ 38 |     return StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: updatedTags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags.union(.TearsgramKeptOnce), forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media)
+    |                                                                                                                                                                                                                                                                  `- error: missing argument label 'arrayLiteral:' in call
+ 39 | }
+ 40 | 
+
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:38:458: error: value of type 'StoreMessage' has no member 'author'
+ 36 |     updatedAttributes.removeAll(where: { $0 is AutoclearTimeoutMessageAttribute })
+ 37 |     updatedAttributes.removeAll(where: { $0 is ConsumableContentMessageAttribute })
+ 38 |     return StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: updatedTags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags.union(.TearsgramKeptOnce), forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: updatedAttributes, media: currentMessage.media)
+    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                          `- error: value of type 'StoreMessage' has no member 'author'
+ 39 | }
+ 40 | 
+
+submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift:129:71: error: cannot convert value of type 'Message' to expected argument type 'StoreMessage'
+127 |                             // attachment instead of an expired placeholder.
+128 |                             transaction.updateMessage(message.id, update: { currentMessage in
+129 |                                 return .update(sgRetainedStoreMessage(currentMessage))
+    |                                                                       `- error: cannot convert value of type 'Message' to expected argument type 'StoreMessage'
+130 |                             })
+131 |                             transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
+Target //Telegram:Swiftgram failed to build
+INFO: Elapsed time: 174.994s, Critical Path: 79.58s
+INFO: 7008 processes: 5234 disk cache hit, 1747 internal, 20 local, 7 worker.
+ERROR: Build did NOT complete successfully
+Traceback (most recent call last):
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/Make.py", line 1431, in <module>
+    build(bazel=bazel_path, arguments=args)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/Make.py", line 677, in build
+    bazel_command_line.invoke_build()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/Make.py", line 340, in invoke_build
+    call_executable(combined_arguments)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/runner/work/tearsgram/tearsgram/build-system/Make/BuildEnvironment.py", line 104, in call_executable
+    subprocess.check_call(resolved_arguments, env=resolved_env)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 534, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command ['/Users/runner/work/_temp/bazel-9.2.0-darwin-arm64', 'build', 'Telegram/Swiftgram', '--announce_rc', '--features=swift.use_global_module_cache', '--verbose_failures', '--remote_cache_async', '--define=buildNumber=18', '--disk_cache=/Users/runner/work/_temp/tearsgram-bazel-cache', '-c', 'opt', '--ios_multi_cpus=arm64', '--watchos_cpus=arm64_32', '--apple_generate_dsym', '--output_groups=+dsyms', '--@rules_rust//rust/settings:lto=fat', '--features=swift.opt_uses_wmo', '--features=swift.opt_uses_osize', '--features=dead_strip', '--objc_enable_binary_stripping'] returned non-zero exit status 1.
+
+=== ghost-tests.log (2 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: unlimited archive persistence and eviction policy; independent ghost controls, migration, story views, call exclusion, FPS/background preferences; local notification defaults
+PASS: local APK/IPA without scope, filename preservation, grant ownership during upload and balanced release
+
+=== icon-prep.log (3 lines, 0 error-like) ===
+--- last 60 lines ---
+/Users/runner/work/tearsgram/tearsgram/branding/AppIcon-1024.png
+  /Users/runner/work/tearsgram/tearsgram/Telegram/Telegram-iOS/Swiftgram.icon/Assets/ModIcon.png
+Primary icon written from AppIcon-1024.png to Telegram/Telegram-iOS/Swiftgram.icon/Assets/ModIcon.png
+
+=== icons.log (6 lines, 0 error-like) ===
+--- last 60 lines ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.029s
+
+OK
+Prepared tearsgram: com.tearsgram.app. The IPA requires a new signature.
+
+=== parse.log (71 lines, 0 error-like) ===
+--- last 60 lines ---
+Parsed: submodules/TelegramUI/Sources/SharedAccountContext.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift
+Parsed: submodules/TelegramUI/Sources/ManagedAudioRecorder.swift
+Parsed: mod-tools/tests/SGVoiceChangerTests.swift
+Parsed: submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGModIconsController.swift
+Parsed: Swiftgram/SGProUI/Sources/SGProUI.swift
+Parsed: Swiftgram/SGProUI/Sources/AppBadgeSelectorController.swift
+Parsed: submodules/TelegramUI/Sources/OpenUrl.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatMessageItemView/Sources/ChatMessageItemView.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatTextInputPanelNode/Sources/ChatTextInputPanelNode.swift
+Parsed: submodules/TelegramUI/Components/MessageInputPanelComponent/Sources/MessageInputPanelComponent.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraUtils.swift
+Parsed: submodules/TelegramCore/Sources/State/PendingMessageManager.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
+Parsed: submodules/TelegramUI/Components/Resources/FetchVideoMediaResource/Sources/FetchVideoMediaResource.swift
+Parsed: submodules/Display/Source/WindowContent.swift
+Parsed: submodules/Camera/Sources/Camera.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraDevice.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/CameraOutput.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/LegacyCamera.swift
+Parsed: submodules/Camera/CameraLegacy/Sources/LegacyCameraImpl.swift
+Parsed: submodules/TelegramUI/Components/VideoMessageCameraScreen/Sources/VideoMessageCameraScreen.swift
+Parsed: Swiftgram/SGTelegramUIExtensions/Sources/SGTelegramUIExtensions.swift
+Parsed: submodules/ICloudResources/Sources/ICloudFileAccess.swift
+Parsed: submodules/ICloudResources/Sources/ICloudResources.swift
+Parsed: submodules/TelegramUI/Sources/ChatControllerOpenAttachmentMenu.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
+Parsed: mod-tools/tests/SGPrivacySettingsTests.swift
+Parsed: mod-tools/tests/ICloudFileAccessTests.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift
+Parsed: submodules/TelegramUI/Sources/AppDelegate.swift
+Parsed: submodules/TelegramUI/Sources/SGLocalNotifications.swift
+Parsed: mod-tools/tests/SGAppStorageTests.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift
+Parsed: submodules/TelegramCore/Sources/Account/AccountManager.swift
+Parsed: submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift
+Parsed: submodules/TelegramPresentationData/Sources/Resources/PresentationResourcesSettings.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift
+Parsed: submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift
+Parsed: submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift
+Parsed: Swiftgram/SGItemListUI/Sources/SGItemListUI.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGDeletedMessagesController.swift
+Parsed: Swiftgram/SGSettingsUI/Sources/SGSettingsController.swift
+Parsed: Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift
+Parsed: submodules/TelegramCore/Sources/Settings/SGDeletedMessages.swift
+Parsed: submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
+Parsed: submodules/TelegramCore/Sources/State/AccountViewTracker.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedConsumePersonalMessagesActions.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedLocalInputActivities.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeConsumeMessageContentsOperations.swift
+Parsed: submodules/TelegramCore/Sources/State/ManagedSynchronizeMarkAllUnseenPersonalMessagesOperations.swift
+Parsed: submodules/TelegramCore/Sources/State/SynchronizePeerReadState.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/MarkAllChatsAsRead.swift
+Parsed: submodules/TelegramCore/Sources/TelegramEngine/Messages/ReplyThreadHistory.swift
+All 70 Swift files parsed. Type checking and an IPA build are separate steps.
+
+=== push-tests.log (1 lines, 0 error-like) ===
+--- last 60 lines ---
+PASS: development, production, missing capability, unknown environment, malformed and oversized profiles
+
+=== strings.log (5 lines, 0 error-like) ===
+--- last 60 lines ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.013s
+
+OK
+
+=== voice-tests.log (3 lines, 0 error-like) ===
+--- last 60 lines ---
+Female voice peak at 16000 Hz sample rate: 270 Hz (input 220 Hz)
+Female voice peak at 48000 Hz sample rate: 270 Hz (input 220 Hz)
+Voice effect persistence, bypass, pitch, silence and streaming continuity passed
